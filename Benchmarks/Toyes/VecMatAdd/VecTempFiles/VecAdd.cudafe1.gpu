@@ -1,0 +1,51 @@
+typedef char __nv_bool;
+# 2214 "/usr/local/cuda-10.2/bin/../targets/x86_64-linux/include/driver_types.h"
+struct CUstream_st;
+# 207 "/usr/include/c++/7/bits/cpp_type_traits.h" 3
+enum _ZNSt12__is_integerIiEUt_E {
+# 207 "/usr/include/c++/7/bits/cpp_type_traits.h" 3
+_ZNSt12__is_integerIiE7__valueE = 1};
+# 205 "/usr/include/c++/7/bits/cpp_type_traits.h" 3
+struct _ZSt12__is_integerIiE;
+# 45 "/usr/include/c++/7/ext/type_traits.h" 3
+struct _ZN9__gnu_cxx11__enable_ifILb1EdEE;
+# 216 "/usr/lib/gcc/x86_64-linux-gnu/7/include/stddef.h" 3
+typedef unsigned long size_t;
+#include "crt/device_runtime.h"
+# 231 "/usr/include/x86_64-linux-gnu/c++/7/bits/c++config.h" 3
+typedef unsigned long _ZSt6size_t;
+# 205 "/usr/include/c++/7/bits/cpp_type_traits.h" 3
+struct _ZSt12__is_integerIiE {};
+# 50 "/usr/include/c++/7/ext/type_traits.h" 3
+typedef double _ZN9__gnu_cxx11__enable_ifILb1EdE6__typeE;
+# 45 "/usr/include/c++/7/ext/type_traits.h" 3
+struct _ZN9__gnu_cxx11__enable_ifILb1EdEE {};
+#if !defined(__CUDABE__)
+# 145 "/usr/local/cuda-10.2/bin/../targets/x86_64-linux/include/crt/common_functions.h"
+ __device_builtin__ ___device__(extern  __no_sc__) int printf(const char *__restrict__, ...);
+#endif
+# 3296 "/usr/local/cuda-10.2/bin/../targets/x86_64-linux/include/crt/device_functions.h"
+___device__(extern  __no_sc__) unsigned __cudaPushCallConfiguration(struct dim3, struct dim3, size_t, struct CUstream_st *);
+# 13 "VecAdd.cu"
+__global__ __var_used__ extern void _Z6VecAddPfS_S_(float *, float *, float *);
+#include "common_functions.h"
+#if !defined(__CUDABE__)
+#endif
+# 13 "VecAdd.cu"
+__global__ __var_used__ void _Z6VecAddPfS_S_(
+# 13 "VecAdd.cu"
+float *A, 
+# 13 "VecAdd.cu"
+float *B, 
+# 13 "VecAdd.cu"
+float *C){
+# 13 "VecAdd.cu"
+{
+# 14 "VecAdd.cu"
+ int __cuda_local_var_20769_7_non_const_i;
+# 14 "VecAdd.cu"
+__cuda_local_var_20769_7_non_const_i = ((int)(((blockIdx.x) * (blockDim.x)) + (threadIdx.x)));
+# 15 "VecAdd.cu"
+(C[__cuda_local_var_20769_7_non_const_i]) = ((A[__cuda_local_var_20769_7_non_const_i]) + (B[__cuda_local_var_20769_7_non_const_i])); 
+# 16 "VecAdd.cu"
+}}
