@@ -1,6 +1,10 @@
 add_library(GPUBeaconPass MODULE
     # List your source files here.
+    CUDAInfo.cpp
     GPUBeacon.cpp
+    Util.cpp
+    Visitor.cpp
+    TaskBuilder.cpp
 )
 
 # Use C++11 to compile your pass (i.e., supply -std=c++11).
