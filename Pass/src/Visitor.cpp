@@ -30,6 +30,7 @@ bool CUDAVisitor::isDim3Struct(Type *Ty) {
 
 void CUDAVisitor::visitCallInst(CallInst *CI) {
   if (!CI) return;
+  // dbgs() << "\nvisitCallInst: " << *CI << "\n\n";
   Function *Callee = CI->getCalledFunction();
 
   // Skip the callee if it is not a function but a value

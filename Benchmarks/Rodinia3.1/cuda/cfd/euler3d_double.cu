@@ -237,7 +237,7 @@ __global__ void cuda_compute_flux(int nelr, int* elements_surrounding_elements, 
 
 	double density_energy_i = variables[i + VAR_DENSITY_ENERGY*nelr];
 
-	double3 velocity_i;             				compute_velocity(density_i, momentum_i, velocity_i);
+	double3 velocity_i;             			  compute_velocity(density_i, momentum_i, velocity_i);
 	double speed_sqd_i                          = compute_speed_sqd(velocity_i);
 	double speed_i                              = sqrt(speed_sqd_i);
 	double pressure_i                           = compute_pressure(density_i, density_energy_i, speed_sqd_i);

@@ -4,7 +4,9 @@ std::string getDemangledName(const Function &F) {
   ItaniumPartialDemangler IPD;
   std::string name = F.getName().str();
   if (IPD.partialDemangle(name.c_str())) return name;
-  return IPD.getFunctionBaseName(nullptr, nullptr);
+  if (IPD.isFunction())
+    return IPD.getFunctionBaseName(nullptr, nullptr);
+  else return IPD.finishDemangle(nullptr, nullptr);
 }
 
 std::string getDemangledName(const Function *F) { return getDemangledName(*F); }

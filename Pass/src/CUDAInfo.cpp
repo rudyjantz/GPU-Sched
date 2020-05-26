@@ -132,15 +132,36 @@ void InvokeInfo::print() {
   dbgs() << "\n\n\n";
 }
 
-void CUDATask::print() {
-  dbgs() << "\n====================CUDA Task=====================\n";
-  dbgs() << "Kernel: " << *KernelInvok << "\n  Grid: " << *gridCtor
-         << "\n Block: " << *blockCtor;
+
+ std::set<CallInst *> CUDAComplexTask::getMemAllocOps()
+  {
+    std::set<CallInst *> MemAllocOps;
+    for (auto UT : SubTasks) {
+      auto tmp = UT.getMemAllocOps();
+      MemAllocOps.insert(tmp.begin(), tmp.end());
+    }
+    return MemAllocOps;
+  }
+
+void CUDAComplexTask::print() {
+  dbgs() << "\n====================CUDA Complex Task=====================\n";
+  dbgs() << "Num. of Unit Tasks: " << SubTasks.size() << "\n";
+  for (auto ST: SubTasks) ST.print();
+  dbgs() << "\n==========================================================\n";
+}
+
+void CUDAComplexTask::Instrument() { dbgs() << "Instrumentation for complex task code comes here."; }
+
+void CUDAUnitTask::print() {
+  dbgs() << "\n---------------------CUDA Unit Task---------------------\n";
+  dbgs() << "Grid: " << *gridCtor << ",\tBlock: " << *blockCtor;
+  dbgs() << "\nKernel: " << *KernelInvok;
   dbgs() << "\nMemory Objects: ";
   for (auto alloc : MemAllocOps) dbgs() << "\n\t" << *alloc;
-  dbgs() << "\nMemory Objects Freed: ";
+  dbgs() << "\nMemory Object Frees: ";
   for (auto f : MemFreeOps)
-    if (f) dbgs() << "\n\t" << *f;
-  dbgs() << "\n==================================================\n";
+    if (f) dbgs() << "\n\t" << *f << "(" << *f->getArgOperand(0) << ")";
+  dbgs() << "\n--------------------------------------------------------\n";
 }
-void CUDATask::Instrument() { dbgs() << "Instrumentation code comes here."; }
+
+void CUDAUnitTask::Instrument() { dbgs() << "Instrumentation for Unit task code comes here."; }
