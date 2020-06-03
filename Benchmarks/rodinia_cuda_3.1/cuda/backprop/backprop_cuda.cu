@@ -78,7 +78,13 @@ void bpnn_train_cuda(BPNN *net, float *eo, float *eh)
   float *input_weights_one_dim;
   float *input_weights_prev_one_dim;
   num_blocks = in / 16;  
-  dim3  grid( 1 , num_blocks);
+  int dim = 1;
+  if (num_blocks >= 65536) {
+    dim = num_blocks / 32768;
+    num_blocks = 32768;
+  }
+
+  dim3  grid( dim , num_blocks);
   dim3  threads(16 , 16);
   
   input_weights_one_dim = (float *) malloc((in + 1)* (hid + 1) * sizeof(float));
@@ -131,7 +137,7 @@ void bpnn_train_cuda(BPNN *net, float *eo, float *eh)
   
   cudaError_t error = cudaGetLastError();
 	if (error != cudaSuccess) {
-		printf("bpnn kernel error: %s\n", cudaGetErrorString(error));
+		printf("1. bpnn kernel error: %s\n", cudaGetErrorString(error));
 		exit(EXIT_FAILURE);
 	}
   
