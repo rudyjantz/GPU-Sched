@@ -5,7 +5,9 @@
 #include <llvm/Analysis/PostDominators.h>
 #include <llvm/Analysis/ScalarEvolution.h>
 #include <llvm/IR/Dominators.h>
+#include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Module.h>
+#include <llvm/IR/NoFolder.h>
 #include <llvm/Pass.h>
 #include <llvm/Support/Debug.h>
 #include <llvm/Support/raw_ostream.h>
@@ -17,6 +19,7 @@ using namespace llvm;
 
 class GPUBeaconPass : public ModulePass {
  private:
+  FunctionCallee BeaconBegin, BeaconRelease;
   CUDAVisitor CUDAInfo;
   std::vector<CUDATask *> Tasks;
   std::set<CallInst *> getMemAllocOps(InvokeInfo II);
@@ -33,6 +36,7 @@ class GPUBeaconPass : public ModulePass {
   bool postDominate(CallInst *C1, CallInst *C2);
 
   void buildCUDATasks(Module &M);
+  void instrument(Module &M);
 
   int getDistance(Instruction *S, Instruction *E);
 

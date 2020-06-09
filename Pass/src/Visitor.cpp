@@ -44,24 +44,31 @@ void CUDAVisitor::visitCallInst(CallInst *CI) {
   if (name == "dim3") {  // meet an dim3 constructor
     GridCtorInfo GCI(CI);
     GridCtors[GCI.getVar()].push_back(GCI);
-    dbgs() << "\n\n[Info] Meet an dim3 constructor: " << *GCI.getVar()
-           << "\n\t---->" << *CI << "\n\n";
+    DEBUG_WITH_TYPE("visitor", dbgs() << "\n\n[Info] Meet an dim3 constructor: "
+                                      << *GCI.getVar() << "\n\t---->" << *CI
+                                      << "\n\n");
   } else if (name == "__cudaPushCallConfiguration") {
     // An call __cudaPushCallConfiguration indicates a call to a kernel
     InvokeInfo II(CI);
     KernelInvokes.push_back(II);
-    dbgs() << "[Info] Meet an Kernel Invoke: \n";
-    II.print();
+    DEBUG_WITH_TYPE("visitor", {
+      dbgs() << "[Info] Meet an Kernel Invoke: \n";
+      II.print();
+    });
   } else if (name == "cudaMalloc") {
     MemAllocInfo MAI(CI);
     MemAllocs[MAI.getObj()].push_back(MAI);
-    dbgs() << "[Info] Meet an CUDA Memory Alloc Operation: \n";
-    MAI.print();
+    DEBUG_WITH_TYPE("visitor", {
+      dbgs() << "[Info] Meet an CUDA Memory Alloc Operation: \n";
+      MAI.print();
+    });
   } else if (name == "cudaFree") {
     MemFreeInfo MFI(CI);
     MemFrees[MFI.getObj()].push_back(MFI);
-    dbgs() << "[Info] Meet an CUDA Memory Free Operation: \n";
-    MFI.print();
+    DEBUG_WITH_TYPE("visitor", {
+      dbgs() << "[Info] Meet an CUDA Memory Free Operation: \n";
+      MFI.print();
+    });
   } else if (auto memcpy = dyn_cast<MemCpyInst>(CI)) {
     auto target = memcpy->getArgOperand(0);
     auto src = memcpy->getArgOperand(1);
@@ -77,19 +84,13 @@ void CUDAVisitor::visitCallInst(CallInst *CI) {
     }
 
     if (TTy && STy) {
-      if (isDim3Struct(STy) && TTy == STy) {
-        // dbgs() << "AggMap: " << *target << " ---> " << *src << "\n";
-        AggMap[target] = src;
-      }
-      if (isDim3Struct(STy) && TTy != STy) {
-        // dbgs() << "CoerseMap: " << *target << " ---> " << *src << "\n";
-        CoerseMap[target] = src;
-      }
+      if (isDim3Struct(STy) && TTy == STy) AggMap[target] = src;
+      if (isDim3Struct(STy) && TTy != STy) CoerseMap[target] = src;
     }
 
   } else if (!Callee->isIntrinsic() && StringRef(name).startswith("__cuda") ||
              StringRef(name).startswith("cuda")) {
-    dbgs() << "Unhandled CUDA Operation: " << name << "\n";
+    dbgs() << "[Info] Unhandled CUDA Operation: " << name << "\n";
   }
 }
 

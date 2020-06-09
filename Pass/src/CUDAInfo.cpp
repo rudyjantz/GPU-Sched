@@ -1,4 +1,3 @@
-
 #include "CUDAInfo.h"
 
 #include <llvm/IR/InstIterator.h>
@@ -132,25 +131,17 @@ void InvokeInfo::print() {
   dbgs() << "\n\n\n";
 }
 
+///========================= CUDA Tasks ============================///
 
- std::set<CallInst *> CUDAComplexTask::getMemAllocOps()
-  {
-    std::set<CallInst *> MemAllocOps;
-    for (auto UT : SubTasks) {
-      auto tmp = UT.getMemAllocOps();
-      MemAllocOps.insert(tmp.begin(), tmp.end());
-    }
-    return MemAllocOps;
+std::vector<Value *> CUDAUnitTask::getCUDAMemSize() {
+  std::vector<Value *> sizes;
+  for (auto allocCall : MemAllocOps) {
+    dbgs() << "CUDA Mem Alloc: " << *allocCall
+           << "\n\tSize: " << *(allocCall->getArgOperand(1)) << "\n";
+    sizes.push_back(allocCall->getArgOperand(1));
   }
-
-void CUDAComplexTask::print() {
-  dbgs() << "\n====================CUDA Complex Task=====================\n";
-  dbgs() << "Num. of Unit Tasks: " << SubTasks.size() << "\n";
-  for (auto ST: SubTasks) ST.print();
-  dbgs() << "\n==========================================================\n";
+  return sizes;
 }
-
-void CUDAComplexTask::Instrument() { dbgs() << "Instrumentation for complex task code comes here."; }
 
 void CUDAUnitTask::print() {
   dbgs() << "\n---------------------CUDA Unit Task---------------------\n";
@@ -164,4 +155,27 @@ void CUDAUnitTask::print() {
   dbgs() << "\n--------------------------------------------------------\n";
 }
 
-void CUDAUnitTask::Instrument() { dbgs() << "Instrumentation for Unit task code comes here."; }
+std::set<CallInst *> CUDAComplexTask::getMemAllocOps() {
+  std::set<CallInst *> MemAllocOps;
+  for (auto UT : SubTasks) {
+    auto tmp = UT.getMemAllocOps();
+    MemAllocOps.insert(tmp.begin(), tmp.end());
+  }
+  return MemAllocOps;
+}
+
+std::vector<Value *> CUDAComplexTask::getCUDAMemSize() {
+  auto MemOps = getMemAllocOps();
+  std::vector<Value *> sizes;
+  for (auto allocCall : MemOps) sizes.push_back(allocCall->getArgOperand(1));
+  return sizes;
+}
+
+void CUDAComplexTask::print() {
+  dbgs() << "\n====================CUDA Complex Task=====================\n";
+  dbgs() << "Num. of Unit Tasks: " << SubTasks.size() << "\n";
+  for (auto ST : SubTasks) ST.print();
+  dbgs() << "Memory Size: ";
+  for (auto s : getCUDAMemSize()) dbgs() << "\n\t" << *s;
+  dbgs() << "\n==========================================================\n";
+}
