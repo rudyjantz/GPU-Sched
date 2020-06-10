@@ -106,17 +106,30 @@ class InvokeInfo {
   void retrieveMemArgs();
 };
 
+static int globalID = 0;
 class CUDATask {
  private:
   int TaskTypeID;  // 1 --> unit task, 2 --> complex task
+  int TaskID;
 
  public:
-  CUDATask(int ID) { TaskTypeID = ID; };
+  CUDATask(int TyID) {
+    TaskTypeID = TyID;
+    TaskID = -1;
+  };
+
+  int getTaskID() {
+    if (TaskID == -1) TaskID = globalID++;
+    return TaskID;
+  }
 
   bool isComplexTask() { return TaskTypeID == 2; }
   bool isUnitTask() { return TaskTypeID == 1; }
   virtual std::set<CallInst *> getMemAllocOps() = 0;
+  virtual std::set<CallInst *> getMemFreeOps() = 0;
   virtual std::vector<Value *> getCUDAMemSize() = 0;
+  virtual std::vector<Value *> getGridDims() = 0;
+  virtual std::vector<Value *> getBlockDims() = 0;
 
   virtual void print() = 0;
 };
@@ -140,7 +153,13 @@ class CUDAUnitTask : public CUDATask {
     KernelInvok = K;
   }
 
+  CallInst *getGridCtor() { return gridCtor; }
+  CallInst *getBlockCtor() { return blockCtor; }
+  std::vector<Value *> getGridDims();
+  std::vector<Value *> getBlockDims();
+
   std::set<CallInst *> getMemAllocOps() { return MemAllocOps; }
+  std::set<CallInst *> getMemFreeOps() { return MemFreeOps; }
   std::vector<Value *> getCUDAMemSize();
   void print();
 };
@@ -157,7 +176,10 @@ class CUDAComplexTask : public CUDATask {
   CUDAComplexTask(std::vector<CUDAUnitTask> &UnitTasks)
       : CUDATask(2), SubTasks(UnitTasks) {}
   std::set<CallInst *> getMemAllocOps();
+  std::set<CallInst *> getMemFreeOps();
   std::vector<Value *> getCUDAMemSize();
+  std::vector<Value *> getGridDims();
+  std::vector<Value *> getBlockDims();
   void print();
 };
 

@@ -27,11 +27,20 @@ int GPUBeaconPass::getDistance(Instruction *S, Instruction *E) {
 bool GPUBeaconPass::runOnModule(Module &M) {
   SmallVector<Type *, 4> ParamTys;
   auto &Ctx = M.getContext();
-  ParamTys.push_back(Type::getInt64Ty(Ctx));
-  FunctionType *BTy = FunctionType::get(Type::getVoidTy(Ctx), ParamTys, false);
-  FunctionType *ETy = FunctionType::get(Type::getVoidTy(Ctx), false);
-  BeaconBegin = M.getOrInsertFunction("beacon_begin", BTy);
+
+  ParamTys.push_back(Type::getInt32Ty(Ctx));  // for TaskID
+  FunctionType *ETy = FunctionType::get(Type::getVoidTy(Ctx), ParamTys, false);
   BeaconRelease = M.getOrInsertFunction("beacon_release", ETy);
+
+  ParamTys.push_back(Type::getInt32Ty(Ctx));  // for gridX
+  ParamTys.push_back(Type::getInt32Ty(Ctx));  // for gridY
+  ParamTys.push_back(Type::getInt32Ty(Ctx));  // for gridZ
+  ParamTys.push_back(Type::getInt32Ty(Ctx));  // for blockX
+  ParamTys.push_back(Type::getInt32Ty(Ctx));  // for blockY
+  ParamTys.push_back(Type::getInt32Ty(Ctx));  // for blockZ
+  ParamTys.push_back(Type::getInt64Ty(Ctx));  // for cuda memory size
+  FunctionType *BTy = FunctionType::get(Type::getVoidTy(Ctx), ParamTys, false);
+  BeaconBegin = M.getOrInsertFunction("beacon_begin", BTy);
 
   CUDAInfo.collect(M);
   buildCUDATasks(M);
@@ -92,19 +101,46 @@ void GPUBeaconPass::instrument(Module &M) {
   for (auto T : Tasks) {
     auto CUDAMemSizes = T->getCUDAMemSize();
     auto CUDAMemOps = T->getMemAllocOps();
+    auto CUDAFreeOps = T->getMemFreeOps();
+    auto GridDims = T->getGridDims();
+    auto BlockDims = T->getBlockDims();
+    auto TID = ConstantInt::getSigned(Type::getInt32Ty(M.getContext()),
+                                      T->getTaskID());
+
+    // instrument beacon_begin()
+    SmallVector<Value *, 4> Args;
+    Args.push_back(TID);
+    for (auto D : GridDims) Args.push_back(D);
+    for (auto D : BlockDims) Args.push_back(D);
+
+    IRB.SetInsertPoint(*CUDAMemOps.rbegin());
+
     int n = CUDAMemSizes.size();
     auto tot = CUDAMemSizes[n - 1];
-    IRB.SetInsertPoint(*CUDAMemOps.rbegin());
     for (int i = n - 2; i >= 0; i--) {
       tot = IRB.CreateAdd(tot, CUDAMemSizes[i]);
     }
-    auto beacon = IRB.CreateCall(BeaconBegin, tot);
 
+    Args.push_back(tot);
+
+    auto beacon = IRB.CreateCall(BeaconBegin, Args);
+
+    // adjust the postion of cudaMalloc
     for (auto op : CUDAMemOps) {
       if (!postDominate(op, beacon)) {
         op->moveAfter(beacon);
         if (auto CI = dyn_cast<CastInst>(op->getOperand(0)))
           CI->moveAfter(beacon);
+      }
+    }
+
+    IRB.SetInsertPoint(*CUDAFreeOps.rbegin());
+    auto beacon_end = IRB.CreateCall(BeaconRelease, TID);
+    for (auto op : CUDAFreeOps) {
+      if (!postDominate(beacon_end, op)) {
+        op->moveBefore(beacon_end);
+        if (auto CI = dyn_cast<CastInst>(op->getOperand(0)))
+          CI->moveBefore(beacon_end);
       }
     }
   }

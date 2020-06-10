@@ -143,6 +143,30 @@ std::vector<Value *> CUDAUnitTask::getCUDAMemSize() {
   return sizes;
 }
 
+std::vector<Value *> CUDAUnitTask::getGridDims() {
+  std::vector<Value *> dims;
+  std::vector<std::string> name({"", "gridX", "gridY", "gridZ"});
+
+  for (int i = 1; i < gridCtor->getNumArgOperands(); i++) {
+    dbgs() << name[i] << ": " << *gridCtor->getArgOperand(i) << "\n";
+    dims.push_back(gridCtor->getArgOperand(i));
+  }
+
+  return dims;
+}
+
+std::vector<Value *> CUDAUnitTask::getBlockDims() {
+  std::vector<Value *> dims;
+  std::vector<std::string> name({"", "blockX", "blockY", "blockZ"});
+
+  for (int i = 1; i < blockCtor->getNumArgOperands(); i++) {
+    dbgs() << name[i] << ": " << *blockCtor->getArgOperand(i) << "\n";
+    dims.push_back(blockCtor->getArgOperand(i));
+  }
+
+  return dims;
+}
+
 void CUDAUnitTask::print() {
   dbgs() << "\n---------------------CUDA Unit Task---------------------\n";
   dbgs() << "Grid: " << *gridCtor << ",\tBlock: " << *blockCtor;
@@ -164,6 +188,15 @@ std::set<CallInst *> CUDAComplexTask::getMemAllocOps() {
   return MemAllocOps;
 }
 
+std::set<CallInst *> CUDAComplexTask::getMemFreeOps() {
+  std::set<CallInst *> MemFreeOps;
+  for (auto UT : SubTasks) {
+    auto tmp = UT.getMemFreeOps();
+    MemFreeOps.insert(tmp.begin(), tmp.end());
+  }
+  return MemFreeOps;
+}
+
 std::vector<Value *> CUDAComplexTask::getCUDAMemSize() {
   auto MemOps = getMemAllocOps();
   std::vector<Value *> sizes;
@@ -171,11 +204,29 @@ std::vector<Value *> CUDAComplexTask::getCUDAMemSize() {
   return sizes;
 }
 
+std::vector<Value *> CUDAComplexTask::getGridDims() {
+  // FIXME: temporarily we use the grid info of the first subtask
+  // for the whole complex task
+  return SubTasks[0].getGridDims();
+}
+
+std::vector<Value *> CUDAComplexTask::getBlockDims() {
+  // FIXME: temporarily we use the grid info of the first subtask
+  // for the whole complex task
+  return SubTasks[0].getBlockDims();
+}
+
 void CUDAComplexTask::print() {
   dbgs() << "\n====================CUDA Complex Task=====================\n";
   dbgs() << "Num. of Unit Tasks: " << SubTasks.size() << "\n";
   for (auto ST : SubTasks) ST.print();
-  dbgs() << "Memory Size: ";
+
+  dbgs() << "\n\nComplexTask Memory Size: ";
   for (auto s : getCUDAMemSize()) dbgs() << "\n\t" << *s;
+
+  dbgs() << "\n\nGrid Dims: ";
+  for (auto ut : SubTasks)
+    dbgs() << "\n\t" << *(ut.getGridCtor()) << "\n\t" << *(ut.getBlockCtor())
+           << "\n";
   dbgs() << "\n==========================================================\n";
 }
