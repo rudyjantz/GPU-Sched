@@ -1,8 +1,8 @@
 include ../../common/make.config
 
 # C compiler
-CC = gcc
-CC_FLAGS = -g  -O2
+CC = clang
+CC_FLAGS = -O2
 
 # CUDA compiler
 NVCC = $(CUDA_DIR)/bin/nvcc

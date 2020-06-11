@@ -30,7 +30,7 @@ bool GPUBeaconPass::runOnModule(Module &M) {
 
   ParamTys.push_back(Type::getInt32Ty(Ctx));  // for TaskID
   FunctionType *ETy = FunctionType::get(Type::getVoidTy(Ctx), ParamTys, false);
-  BeaconRelease = M.getOrInsertFunction("beacon_release", ETy);
+  BeaconRelease = M.getOrInsertFunction("bemps_free", ETy);
 
   ParamTys.push_back(Type::getInt32Ty(Ctx));  // for gridX
   ParamTys.push_back(Type::getInt32Ty(Ctx));  // for gridY
@@ -40,7 +40,7 @@ bool GPUBeaconPass::runOnModule(Module &M) {
   ParamTys.push_back(Type::getInt32Ty(Ctx));  // for blockZ
   ParamTys.push_back(Type::getInt64Ty(Ctx));  // for cuda memory size
   FunctionType *BTy = FunctionType::get(Type::getVoidTy(Ctx), ParamTys, false);
-  BeaconBegin = M.getOrInsertFunction("beacon_begin", BTy);
+  BeaconBegin = M.getOrInsertFunction("bemps_begin", BTy);
 
   CUDAInfo.collect(M);
   buildCUDATasks(M);
