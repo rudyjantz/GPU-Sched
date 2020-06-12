@@ -1,3 +1,7 @@
 **/build
+**/*.o
+**/*.ll
+**/obj
+**/foo
 Benchmarks/rodinia_cuda_3.1/data 
 Benchmarks/rodinia_cuda_3.1/bin
