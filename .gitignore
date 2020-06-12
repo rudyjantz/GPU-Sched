@@ -3,5 +3,8 @@
 **/*.ll
 **/obj
 **/foo
+.vscode
 Benchmarks/rodinia_cuda_3.1/data 
 Benchmarks/rodinia_cuda_3.1/bin
+Benchmarks/rodinia_cuda_3.1/cuda/backprop/backprop
+Benchmarks/rodinia_cuda_3.1/cuda/bfs/bfs
