@@ -11,9 +11,11 @@
 #include <time.h>
 #include <unistd.h>
 
-#include <bemps/bemps.hpp>
+// #include <bemps/bemps.hpp>
 #include <iostream>
 #include <map>
+
+#include "bemps.hpp"
 
 #define BEMPS_DEBUG
 
