@@ -46,7 +46,7 @@ bool GPUBeaconPass::runOnModule(Module &M) {
   buildCUDATasks(M);
   instrument(M);
 
-  return false;
+  return true;
 }
 
 ///==================== CUDA Task Builder ============================///
@@ -85,7 +85,7 @@ void GPUBeaconPass::buildCUDATasks(Module &M) {
     }
 
     if (Union.size() == 1)
-      Tasks.push_back(&Tmp[i]);
+      Tasks.push_back(new CUDAUnitTask(Tmp[i]));
     else {
       std::vector<CUDAUnitTask> toBeMerged;
       for (auto l : Union) toBeMerged.push_back(Tmp[l]);
@@ -106,7 +106,6 @@ void GPUBeaconPass::instrument(Module &M) {
     auto BlockDims = T->getBlockDims();
     auto TID = ConstantInt::getSigned(Type::getInt32Ty(M.getContext()),
                                       T->getTaskID());
-
     // instrument beacon_begin()
     SmallVector<Value *, 4> Args;
     Args.push_back(TID);
@@ -129,8 +128,6 @@ void GPUBeaconPass::instrument(Module &M) {
     for (auto op : CUDAMemOps) {
       if (!postDominate(op, beacon)) {
         op->moveAfter(beacon);
-        //   if (auto CI = dyn_cast<CastInst>(op->getOperand(0)))
-        //     CI->moveAfter(beacon);
       }
     }
 
@@ -139,8 +136,6 @@ void GPUBeaconPass::instrument(Module &M) {
     for (auto op : CUDAFreeOps) {
       if (!postDominate(beacon_end, op)) {
         beacon_end->moveAfter(op);
-        // if (auto CI = dyn_cast<CastInst>(op->getOperand(0)))
-        // CI->moveBefore(beacon_end);
       }
     }
   }
@@ -284,7 +279,7 @@ bool GPUBeaconPass::postDominate(CallInst *C1, CallInst *C2) {
 
 char GPUBeaconPass::ID = 0;
 
-#if 1
+#if 0
 static RegisterPass<GPUBeaconPass> X("GB", "GPUBeacon", false, false);
 
 #else

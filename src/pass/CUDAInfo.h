@@ -145,6 +145,13 @@ class CUDAUnitTask : public CUDATask {
   std::set<CallInst *> MemFreeOps;
 
  public:
+  CUDAUnitTask(const CUDAUnitTask &UT)
+      : CUDATask(1), MemAllocOps(UT.MemAllocOps), MemFreeOps(UT.MemFreeOps) {
+    gridCtor = UT.gridCtor;
+    blockCtor = UT.blockCtor;
+    KernelInvok = UT.KernelInvok;
+  }
+
   CUDAUnitTask(CallInst *G, CallInst *B, CallInst *K, std::set<CallInst *> &M,
                std::set<CallInst *> &F)
       : CUDATask(1), MemAllocOps(M), MemFreeOps(F) {

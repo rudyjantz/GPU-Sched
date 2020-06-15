@@ -1,7 +1,6 @@
 include ../../common/make.config
 
 CUDA_LIB =	-lcuda -lcudart
-CUDA_FLAG = -arch sm_20
 
 # ====================================================================================================100
 #	END
@@ -51,7 +50,7 @@ CUDA_FLAG = -arch sm_20
 #	GCC
 # ====================================================================================================100
 
-C_C = gcc
+C_C = clang
 # OMP_LIB = -lgomp
 # OMP_FLAG = -fopenmp
 # OCL_LIB = -lOpenCL
@@ -91,14 +90,16 @@ b+tree.out:	./main.o \
 		./util/timer/timer.o \
 		./util/num/num.o \
 		./util/cuda/cuda.o
-	$(C_C)	./main.o \
+	$(C_C) -O1	./main.o \
 			./kernel/kernel_gpu_cuda_wrapper.o \
 			./kernel/kernel_gpu_cuda_wrapper_2.o \
 			./util/timer/timer.o \
 			./util/num/num.o \
 			./util/cuda/cuda.o \
-			-lm \
 			-L$(CUDA_LIB_DIR) \
+			-L$(BEMPS_LIB_DIR) \
+			-lm \
+			-lbemps \
 			$(CUDA_LIB)\
                        -o b+tree.out
 
@@ -126,20 +127,18 @@ main.o:	./common.h \
 ./kernel/kernel_gpu_cuda_wrapper.o:	./common.h \
 									./kernel/kernel_gpu_cuda_wrapper.h \
 									./kernel/kernel_gpu_cuda_wrapper.cu
-	$(CUD_C) $(KERNEL_DIM) ./kernel/kernel_gpu_cuda_wrapper.cu \
-				-c \
-				-o ./kernel/kernel_gpu_cuda_wrapper.o \
-				-O3 \
-				$(CUDA_FLAG)
+	$(CUD_C) --cuda ./kernel/kernel_gpu_cuda_wrapper.cu -o /tmp/kernel_gpu_cuda_wrapper.ii
+	$(C_C) -Xclang -load -Xclang $(BEMPS_PASS) /tmp/kernel_gpu_cuda_wrapper.ii \
+				-O1 -c \
+				-o ./kernel/kernel_gpu_cuda_wrapper.o
 
 ./kernel/kernel_gpu_cuda_wrapper_2.o:	./common.h \
 										./kernel/kernel_gpu_cuda_wrapper_2.h \
 										./kernel/kernel_gpu_cuda_wrapper_2.cu
-	$(CUD_C) $(KERNEL_DIM) ./kernel/kernel_gpu_cuda_wrapper_2.cu \
-				-c \
-				-o ./kernel/kernel_gpu_cuda_wrapper_2.o \
-				-O3 \
-				$(CUDA_FLAG)
+	$(CUD_C) --cuda ./kernel/kernel_gpu_cuda_wrapper_2.cu -o /tmp/kernel_gpu_cuda_wrapper_2.ii
+	$(C_C) -Xclang -load -Xclang $(BEMPS_PASS) /tmp/kernel_gpu_cuda_wrapper_2.ii \
+				-O1 -c \
+				-o ./kernel/kernel_gpu_cuda_wrapper_2.o
 
 # ======================================================================================================================================================150
 #	UTILITIES
@@ -167,8 +166,7 @@ main.o:	./common.h \
 	$(CUD_C)	./util/cuda/cuda.cu \
 				-c \
 				-o ./util/cuda/cuda.o \
-				-O3 \
-				$(CUDA_FLAG)
+				-O1
 
 # ======================================================================================================================================================150
 #	END
