@@ -129,8 +129,8 @@ void GPUBeaconPass::instrument(Module &M) {
     for (auto op : CUDAMemOps) {
       if (!postDominate(op, beacon)) {
         op->moveAfter(beacon);
-        if (auto CI = dyn_cast<CastInst>(op->getOperand(0)))
-          CI->moveAfter(beacon);
+        //   if (auto CI = dyn_cast<CastInst>(op->getOperand(0)))
+        //     CI->moveAfter(beacon);
       }
     }
 
@@ -138,9 +138,9 @@ void GPUBeaconPass::instrument(Module &M) {
     auto beacon_end = IRB.CreateCall(BeaconRelease, TID);
     for (auto op : CUDAFreeOps) {
       if (!postDominate(beacon_end, op)) {
-        op->moveBefore(beacon_end);
-        if (auto CI = dyn_cast<CastInst>(op->getOperand(0)))
-          CI->moveBefore(beacon_end);
+        beacon_end->moveAfter(op);
+        // if (auto CI = dyn_cast<CastInst>(op->getOperand(0)))
+        // CI->moveBefore(beacon_end);
       }
     }
   }
@@ -284,13 +284,23 @@ bool GPUBeaconPass::postDominate(CallInst *C1, CallInst *C2) {
 
 char GPUBeaconPass::ID = 0;
 
+#if 1
 static RegisterPass<GPUBeaconPass> X("GB", "GPUBeacon", false, false);
 
-// Automatically enable the pass.
-// http://adriansampson.net/blog/clangpass.html
-// static void registerGPUBeaconPass(const PassManagerBuilder &,
-//                                   legacy::PassManagerBase &PM) {
-//   PM.add(new GPUBeaconPass());
-// }
-// static RegisterStandardPasses RegisterMyPass(
-//     PassManagerBuilder::EP_EarlyAsPossible, registerGPUBeaconPass);
+#else
+
+static void registerGPUBeaconPass(const PassManagerBuilder &,
+                                  legacy::PassManagerBase &PM) {
+  // PM.add(createPromoteMemoryToRegisterPass());
+  // PM.add(createLoopSimplifyPass());
+  PM.add(new DominatorTreeWrapperPass());
+  PM.add(new LoopInfoWrapperPass());
+  PM.add(new ScalarEvolutionWrapperPass());
+  PM.add(new GPUBeaconPass());
+}
+
+// Use EP_OptimizerLast to make sure the pass is run after all other
+// optimization passes, such that the debug data is not removed by others
+static RegisterStandardPasses RegisterMyPass(
+    PassManagerBuilder::EP_OptimizerLast, registerGPUBeaconPass);
+#endif

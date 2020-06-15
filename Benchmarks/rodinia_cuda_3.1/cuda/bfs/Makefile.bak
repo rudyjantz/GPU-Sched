@@ -9,8 +9,7 @@ SRC = bfs.cu
 EXE = bfs
 
 release: $(SRC)
-	$(CC) --cuda $(SRC) -o /tmp/bfs.ii
-	clang -Xclang -load -Xclang $(BEMPS_PASS) /tmp/bfs.ii -o $(EXE) -I$(INCLUDE) -L$(CUDA_LIB_DIR) -L$(BEMPS_LIB_DIR) -lbemps -lcudart -lrt -lm
+	$(CC) $(SRC) -o $(EXE) -I$(INCLUDE) -L$(CUDA_LIB_DIR) 
 
 enum: $(SRC)
 	$(CC) -deviceemu $(SRC) -o $(EXE) -I$(INCLUDE) -L$(CUDA_LIB_DIR) 
