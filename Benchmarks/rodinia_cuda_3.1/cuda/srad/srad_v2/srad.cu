@@ -127,6 +127,15 @@ runTest( int argc, char** argv)
 
 #ifdef GPU
 
+
+	//Currently the input size must be divided by 16 - the block size
+	int block_x = cols/BLOCK_SIZE ;
+    int block_y = rows/BLOCK_SIZE ;
+
+    dim3 dimBlock(BLOCK_SIZE, BLOCK_SIZE);
+	dim3 dimGrid(block_x , block_y);
+    
+
 	//Allocate device memory
     cudaMalloc((void**)& J_cuda, sizeof(float)* size_I);
     cudaMalloc((void**)& C_cuda, sizeof(float)* size_I);
@@ -216,13 +225,6 @@ runTest( int argc, char** argv)
 
 #ifdef GPU
 
-	//Currently the input size must be divided by 16 - the block size
-	int block_x = cols/BLOCK_SIZE ;
-    int block_y = rows/BLOCK_SIZE ;
-
-    dim3 dimBlock(BLOCK_SIZE, BLOCK_SIZE);
-	dim3 dimGrid(block_x , block_y);
-    
 
 	//Copy data from main memory to device memory
 	cudaMemcpy(J_cuda, J, sizeof(float) * size_I, cudaMemcpyHostToDevice);

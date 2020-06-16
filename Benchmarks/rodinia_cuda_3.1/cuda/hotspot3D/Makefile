@@ -1,8 +1,10 @@
-include ~/rodinia_3.0/common/make.config
+include ../../common/make.config
 
-CC := $(CUDA_DIR)/bin/nvcc
+NVCC := $(CUDA_DIR)/bin/nvcc
+CC := clang
 
 INCLUDE := $(CUDA_DIR)/include
+FLAGS := -O1 -Xclang -load -Xclang $(BEMPS_PASS) 
 
 SRC = 3D.cu
 
@@ -10,9 +12,9 @@ EXE = 3D
 
 OUTPUT = *.out
 
-FLAGS = -g -G #-arch sm_20 --ptxas-options=-v
 release: $(SRC)
-	$(CC) $(KERNEL_DIM) $(FLAGS) $(SRC) -o $(EXE) -I$(INCLUDE) -L$(CUDA_LIB_DIR) 
+	$(NVCC) --cuda $(SRC) -o /tmp/3D.ii
+	$(CC) $(FLAGS) /tmp/3D.ii -o $(EXE) -I$(INCLUDE) -L$(CUDA_LIB_DIR) -L$(BEMPS_LIB_DIR) -lcudart -lm -lrt -lbemps
 
 enum: $(SRC)
 	$(CC) $(KERNEL_DIM) $(FLAGS) -deviceemu $(SRC) -o $(EXE) -I$(INCLUDE) -L$(CUDA_LIB_DIR) 

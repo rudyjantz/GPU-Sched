@@ -101,12 +101,6 @@ int main(int argc, char *argv []){
 	// 	GPU VARIABLES
 	//================================================================================80
 
-	// CUDA kernel execution parameters
-	dim3 threads;
-	int blocks_x;
-	dim3 blocks;
-	dim3 blocks2;
-	dim3 blocks3;
 
 	// memory sizes
 	int mem_size;															// matrix memory size
@@ -228,6 +222,23 @@ int main(int argc, char *argv []){
 	jE[Nc-1] = Nc-1;														// changes IMAGE rightmost column index from Nc to Nc-1
 
 	//================================================================================80
+	// 	KERNEL EXECUTION PARAMETERS
+	//================================================================================80
+
+	// all kernels operating on entire matrix
+	int blocks_x = Ne/NUMBER_THREADS;
+	if (Ne % NUMBER_THREADS != 0){												// compensate for division remainder above by adding one grid
+		blocks_x = blocks_x + 1;																	
+	}
+
+	// CUDA kernel execution parameters
+	dim3 threads(NUMBER_THREADS, 1); 					// define the number of threads in the block
+	dim3 blocks(blocks_x, 1); 							// define the number of blocks in the grid
+	dim3 blocks2;
+	dim3 blocks3;
+
+
+	//================================================================================80
 	// 	GPU SETUP
 	//================================================================================80
 
@@ -260,19 +271,6 @@ int main(int argc, char *argv []){
 
 	checkCUDAError("setup");
 
-	//================================================================================80
-	// 	KERNEL EXECUTION PARAMETERS
-	//================================================================================80
-
-	// all kernels operating on entire matrix
-	threads.x = NUMBER_THREADS;												// define the number of threads in the block
-	threads.y = 1;
-	blocks_x = Ne/threads.x;
-	if (Ne % threads.x != 0){												// compensate for division remainder above by adding one grid
-		blocks_x = blocks_x + 1;																	
-	}
-	blocks.x = blocks_x;													// define the number of blocks in the grid
-	blocks.y = 1;
 
 	time5 = get_time();
 

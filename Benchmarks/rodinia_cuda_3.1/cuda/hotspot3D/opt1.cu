@@ -70,6 +70,10 @@ void hotspot_opt1(float *p, float *tIn, float *tOut,
 
     size_t s = sizeof(float) * nx * ny * nz;  
     float  *tIn_d, *tOut_d, *p_d;
+
+    dim3 block_dim(64, 4, 1);
+    dim3 grid_dim(nx / 64, ny / 4, 1);
+
     cudaMalloc((void**)&p_d,s);
     cudaMalloc((void**)&tIn_d,s);
     cudaMalloc((void**)&tOut_d,s);
@@ -77,9 +81,6 @@ void hotspot_opt1(float *p, float *tIn, float *tOut,
     cudaMemcpy(p_d, p, s, cudaMemcpyHostToDevice);
 
     cudaFuncSetCacheConfig(hotspotOpt1, cudaFuncCachePreferL1);
-
-    dim3 block_dim(64, 4, 1);
-    dim3 grid_dim(nx / 64, ny / 4, 1);
 
     long long start = get_time();
     for (int i = 0; i < numiter; ++i) {

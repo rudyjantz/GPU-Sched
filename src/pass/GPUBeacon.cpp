@@ -127,6 +127,13 @@ void GPUBeaconPass::instrument(Module &M) {
     // adjust the postion of cudaMalloc
     for (auto op : CUDAMemOps) {
       if (!postDominate(op, beacon)) {
+        // dbgs() << "OP: " << *op;
+        for (auto it = op->user_begin(); it != op->user_end(); it++) {
+          auto user = dyn_cast<CallInst>(*it);
+          if (user && !postDominate(user, beacon)) user->moveAfter(beacon);
+          // dbgs() << "\n\tUser: " << *user;
+        }
+        // dbgs() << "\n\n";
         op->moveAfter(beacon);
       }
     }
@@ -138,6 +145,8 @@ void GPUBeaconPass::instrument(Module &M) {
         beacon_end->moveAfter(op);
       }
     }
+
+    // M.dump();
   }
 }
 

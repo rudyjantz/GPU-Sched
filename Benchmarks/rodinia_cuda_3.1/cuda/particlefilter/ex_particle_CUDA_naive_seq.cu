@@ -456,6 +456,9 @@ void particleFilter(int * I, int IszX, int IszY, int Nfr, int * seed, int Nparti
 	int * ind = (int*)malloc(sizeof(int)*countOnes);
 	double * u = (double *)malloc(sizeof(double)*Nparticles);
 	double * u_GPU;
+
+	//Set number of threads
+	int num_blocks = ceil((double) Nparticles/(double) threads_per_block);
 	
 	//CUDA memory allocation
 	check_error(cudaMalloc((void **) &arrayX_GPU, sizeof(double)*Nparticles));
@@ -564,8 +567,6 @@ void particleFilter(int * I, int IszX, int IszY, int Nfr, int * seed, int Nparti
 		cudaMemcpy(CDF_GPU, CDF, sizeof(double)*Nparticles, cudaMemcpyHostToDevice);
 		cudaMemcpy(u_GPU, u, sizeof(double)*Nparticles, cudaMemcpyHostToDevice);
 		long long end_copy = get_time();
-		//Set number of threads
-		int num_blocks = ceil((double) Nparticles/(double) threads_per_block);
 		
 		//KERNEL FUNCTION CALL
 		kernel <<< num_blocks, threads_per_block >>> (arrayX_GPU, arrayY_GPU, CDF_GPU, u_GPU, xj_GPU, yj_GPU, Nparticles);

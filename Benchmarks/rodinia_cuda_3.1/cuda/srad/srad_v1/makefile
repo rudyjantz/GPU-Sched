@@ -1,6 +1,11 @@
 include ../../../common/make.config
+BEMPS_BUILD_DIR = $(abspath ../../../../../build)
+BEMPS_LIB_DIR = $(BEMPS_BUILD_DIR)/runtime/bemps
+BEMPS_PASS = $(BEMPS_BUILD_DIR)/pass/libGPUBeaconPass.so
 
-CC := $(CUDA_DIR)/bin/nvcc
+NVCC := $(CUDA_DIR)/bin/nvcc
+CC := clang
+FLAGS := -O1 -Xclang -load -Xclang $(BEMPS_PASS) 
 
 INCLUDE := $(CUDA_DIR)/include
 
@@ -14,24 +19,9 @@ INCLUDE := $(CUDA_DIR)/include
 	# command n
 
 # link objects(binaries) together
-a.out:		main.o
-	$(CC)	main.o \
-				-I$(INCLUDE) \
-				-L$(CUDA_LIB_DIR)  \
-				-lm -lcuda -lcudart -o srad
-
-# compile main function file into object (binary)
-main.o: 	main.cu \
-				define.c \
-				graphics.c \
-				extract_kernel.cu \
-				prepare_kernel.cu \
-				reduce_kernel.cu \
-				srad_kernel.cu \
-				srad2_kernel.cu \
-				compress_kernel.cu
-	nvcc	main.cu \
-				-c -O3 -arch sm_35
+a.out:		main.cu
+	$(NVCC)	--cuda main.cu -o /tmp/srad_main.ii
+	$(CC) $(FLAGS)	/tmp/srad_main.ii -I$(INCLUDE) -L$(CUDA_LIB_DIR) -L$(BEMPS_LIB_DIR) -lm -lcuda -lcudart -lbemps -o srad
 
 # delete all object files
 clean:

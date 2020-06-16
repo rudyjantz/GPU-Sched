@@ -684,6 +684,8 @@ void particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, 
     int * seed_GPU;
     double* partial_sums;
 
+    int num_blocks = ceil((double) Nparticles / (double) threads_per_block);
+
     //CUDA memory allocation
     check_error(cudaMalloc((void **) &arrayX_GPU, sizeof (double) *Nparticles));
     check_error(cudaMalloc((void **) &arrayY_GPU, sizeof (double) *Nparticles));
@@ -724,7 +726,6 @@ void particleFilter(unsigned char * I, int IszX, int IszY, int Nfr, int * seed, 
     check_error(cudaMemcpy(seed_GPU, seed, sizeof (int) *Nparticles, cudaMemcpyHostToDevice));
     long long send_end = get_time();
     printf("TIME TO SEND TO GPU: %f\n", elapsed_time(send_start, send_end));
-    int num_blocks = ceil((double) Nparticles / (double) threads_per_block);
 
 
     for (k = 1; k < Nfr; k++) {

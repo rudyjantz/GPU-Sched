@@ -327,6 +327,22 @@ void ForwardSub()
 {
 	int t;
     float *m_cuda,*a_cuda,*b_cuda;
+
+	int block_size,grid_size;
+	block_size = MAXBLOCKSIZE;
+	grid_size = (Size/block_size) + (!(Size%block_size)? 0:1);
+	//printf("1d grid size: %d\n",grid_size);
+
+	dim3 dimBlock(block_size);
+	dim3 dimGrid(grid_size);
+	//dim3 dimGrid( (N/dimBlock.x) + (!(N%dimBlock.x)?0:1) );
+	
+	int blockSize2d, gridSize2d;
+	blockSize2d = BLOCK_SIZE_XY;
+	gridSize2d = (Size/blockSize2d) + (!(Size%blockSize2d?0:1)); 
+	
+	dim3 dimBlockXY(blockSize2d,blockSize2d);
+	dim3 dimGridXY(gridSize2d,gridSize2d);
 	
 	// allocate memory on GPU
 	cudaMalloc((void **) &m_cuda, Size * Size * sizeof(float));
@@ -340,24 +356,6 @@ void ForwardSub()
 	cudaMemcpy(a_cuda, a, Size * Size * sizeof(float),cudaMemcpyHostToDevice );
 	cudaMemcpy(b_cuda, b, Size * sizeof(float),cudaMemcpyHostToDevice );
 	
-	int block_size,grid_size;
-	
-	block_size = MAXBLOCKSIZE;
-	grid_size = (Size/block_size) + (!(Size%block_size)? 0:1);
-	//printf("1d grid size: %d\n",grid_size);
-
-
-	dim3 dimBlock(block_size);
-	dim3 dimGrid(grid_size);
-	//dim3 dimGrid( (N/dimBlock.x) + (!(N%dimBlock.x)?0:1) );
-	
-	int blockSize2d, gridSize2d;
-	blockSize2d = BLOCK_SIZE_XY;
-	gridSize2d = (Size/blockSize2d) + (!(Size%blockSize2d?0:1)); 
-	
-	dim3 dimBlockXY(blockSize2d,blockSize2d);
-	dim3 dimGridXY(gridSize2d,gridSize2d);
-
     // begin timing kernels
     struct timeval time_start;
     gettimeofday(&time_start, NULL);
