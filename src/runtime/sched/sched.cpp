@@ -296,10 +296,12 @@ void sched_vector(void) {
       }
 
       for (tmp_dev_id = 0; tmp_dev_id < NUM_GPUS; tmp_dev_id++) {
-        if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
+        /*if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
              GPU_RES[tmp_dev_id].mem_B) &&
             ((gpu_res_in_use[tmp_dev_id].cores + comm->beacon.cores) <
-             GPU_RES[tmp_dev_id].cores)) {
+             GPU_RES[tmp_dev_id].cores)) {*/
+        if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
+             GPU_RES[tmp_dev_id].mem_B)) {
           gpu_res_in_use[tmp_dev_id].mem_B += comm->beacon.mem_B;
           gpu_res_in_use[tmp_dev_id].cores += comm->beacon.cores;
           assigned = 1;
@@ -370,10 +372,12 @@ void sched_round_robin(void) {
       }
 
       while (1) {
-        if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
+        /*if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
              GPU_RES[tmp_dev_id].mem_B) &&
             ((gpu_res_in_use[tmp_dev_id].cores + comm->beacon.cores) <
-             GPU_RES[tmp_dev_id].cores)) {
+             GPU_RES[tmp_dev_id].cores)) {*/
+        if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
+             GPU_RES[tmp_dev_id].mem_B)) {
           gpu_res_in_use[tmp_dev_id].mem_B += comm->beacon.mem_B;
           gpu_res_in_use[tmp_dev_id].cores += comm->beacon.cores;
           assigned = 1;
@@ -444,7 +448,7 @@ void sched_round_robin(void) {
     BEMPS_SCHED_LOG("*tail_p: " << (*tail_p) << "\n");
     BEMPS_SCHED_LOG("bcn_idx: " << (bcn_idx) << "\n");
     while (bcn_idx != *tail_p) {
-      BEMPS_SCHED_LOG("bcn_idx: " << (bcn_idx) << "\n");
+      BEMPS_SCHED_LOG("Second loop bcn_idx: " << (bcn_idx) << "\n");
 
       assigned = 0;
       tmp_dev_id = device_id;
@@ -457,14 +461,19 @@ void sched_round_robin(void) {
       stats.num_beacons++;
 
       while (1) {
-        if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
+        /*if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
              GPU_RES[tmp_dev_id].mem_B) &&
             ((gpu_res_in_use[tmp_dev_id].cores + comm->beacon.cores) <
-             GPU_RES[tmp_dev_id].cores)) {
+             GPU_RES[tmp_dev_id].cores)) {*/
+        if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
+             GPU_RES[tmp_dev_id].mem_B)) {
           gpu_res_in_use[tmp_dev_id].mem_B += comm->beacon.mem_B;
           gpu_res_in_use[tmp_dev_id].cores += comm->beacon.cores;
           assigned = 1;
+          BEMPS_SCHED_LOG("  assigned\n");
           break;
+        }else{
+          BEMPS_SCHED_LOG("  not assigned\n");
         }
 
         tmp_dev_id = (tmp_dev_id + 1) & (NUM_GPUS - 1);
