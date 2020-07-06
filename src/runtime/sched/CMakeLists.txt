@@ -8,3 +8,7 @@ include_directories(
 )
 
 target_link_libraries(bemps_sched ${LIBRT} bemps pthread)
+
+if (GPU_RES)
+    add_definitions(-D${GPU_RES})
+endif()
