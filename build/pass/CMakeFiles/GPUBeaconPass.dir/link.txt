@@ -1,0 +1,1 @@
+/usr/bin/c++ -fPIC   -shared  -o libGPUBeaconPass.so CMakeFiles/GPUBeaconPass.dir/CUDAInfo.cpp.o CMakeFiles/GPUBeaconPass.dir/GPUBeacon.cpp.o CMakeFiles/GPUBeaconPass.dir/Util.cpp.o CMakeFiles/GPUBeaconPass.dir/Visitor.cpp.o  -L/home/cc/wo/llvm-project/build/./lib 

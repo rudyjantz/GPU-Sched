@@ -1,0 +1,1 @@
+/usr/bin/c++ -fPIC -g  -shared -Wl,-soname,libbemps.so -o libbemps.so CMakeFiles/bemps.dir/bemps.cpp.o  -L/home/cc/wo/llvm-project/build/./lib -Wl,-rpath,/home/cc/wo/llvm-project/build/./lib:/usr/local/cuda/lib64 /usr/local/cuda/lib64/libcudart.so /usr/lib/x86_64-linux-gnu/librt.so 

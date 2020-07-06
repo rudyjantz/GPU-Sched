@@ -1,0 +1,36 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/cc/wo/GPU-Sched/src/runtime/bemps/bemps.hpp
+semaphore.h
+-
+
+/home/cc/wo/GPU-Sched/src/runtime/sched/sched.cpp
+assert.h
+-
+errno.h
+-
+signal.h
+-
+stdio.h
+-
+string.h
+-
+unistd.h
+-
+algorithm
+-
+iostream
+-
+list
+-
+queue
+-
+bemps.hpp
+/home/cc/wo/GPU-Sched/src/runtime/sched/bemps.hpp
+
