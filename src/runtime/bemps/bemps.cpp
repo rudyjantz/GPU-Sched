@@ -360,6 +360,7 @@ void _send_beacon_at_exit(void)
 
   exit_beacon_q_idx = _inc_head(&bemps_shm.gen->beacon_q_head);
   comm = &bemps_shm.comm[exit_beacon_q_idx];
+  comm->pid = pid;
   comm->exit_flag = 1;
 
   // XXX This should be the last field that we change in the comm structure,

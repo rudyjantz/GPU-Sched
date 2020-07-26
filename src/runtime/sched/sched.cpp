@@ -470,6 +470,10 @@ void sched_single_assignment(void) {
   struct timespec ts;
   bemps_shm_comm_t *comm;
 
+  // FIXME initialize this in the proper place and in a maintainable way
+  avail_device_ids.push_back(0);
+  avail_device_ids.push_back(1);
+
   device_id = 0;
   head_p = &bemps_shm_p->gen->beacon_q_head;
   tail_p = &bemps_shm_p->gen->beacon_q_tail;
@@ -512,6 +516,7 @@ void sched_single_assignment(void) {
         avail_device_ids.push_back(pid_to_device_id[comm->pid]);
         pid_to_device_id.erase(comm->pid);
         comm->exit_flag = 0;
+        comm->pid = 0;
       } else {
         if (pid_to_device_id.find(comm->pid) == pid_to_device_id.end()) {
           // Not found: We're seeing this pid for the first time.
