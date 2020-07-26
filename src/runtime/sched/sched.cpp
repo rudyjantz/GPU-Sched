@@ -101,9 +101,31 @@ typedef struct {
   int max_observed_batch_size;
 } sched_stats_t;
 
+//
 // single-assignment scheduler
+//
 std::map<pid_t, int> pid_to_device_id;
 std::vector<int> avail_device_ids;
+
+
+//
+// C:G scheduler
+//
+
+// Number of CPU cores producing work for 1 GPU
+// FIXME This nasty, though, because the workload driver has to match this
+// exactly (or you'll get an error in the scheduler due to no available device)
+#define CORE_TO_GPU_RATIO 6
+#define JOBS_PER_GPU      CORE_TO_GPU_RATIO // ...renaming as num jobs per GPU
+
+typedef struct {
+    int device_id;
+    int count;
+} device_id_count_t;
+std::map<pid_t, device_id_count_t *> pid_to_device_id_counts;
+std::list<device_id_count_t *> avail_device_id_counts;
+
+
 
 bemps_shm_t *bemps_shm_p;
 sched_stats_t stats;
@@ -195,7 +217,7 @@ void sigint_handler(int unused) {
   exit(0);
 }
 
-struct CustomCompare {
+struct MemFootprintCompare {
   bool operator()(const bemps_shm_comm_t *lhs, const bemps_shm_comm_t *rhs) {
     // sort in increasing order. priority queue .top() and pop() will
     // therefore return the largest values
@@ -210,7 +232,14 @@ struct CustomCompare {
     // sort in increasing order. iterate with index. use back() and pop_back()
     // return lhs->beacon.mem_B < rhs->beacon.mem_B;
   }
-} custom_compare;
+} mem_footprint_compare;
+
+struct AvailDevicesCompare {
+  bool operator()(const device_id_count_t *lhs, const device_id_count_t *rhs) {
+    // sort in decreasing order. iterate with index.
+    return lhs->count > rhs->count;
+  }
+} avail_devices_compare;
 
 
 // Our custom scheduler, multi-GPU with beacons
@@ -290,7 +319,7 @@ void sched_mgb(void) {
     // Second loop: Walk the boomers. This time handle regular beacons, and
     // attempt to assign them to a device. The boomers are sorted by memory
     // footprint, highest to lowest.
-    boomers.sort(custom_compare);
+    boomers.sort(mem_footprint_compare);
     boomers_len = boomers.size();
     if (boomers_len > stats.max_len_boomers) {
       stats.max_len_boomers = boomers_len;
@@ -343,6 +372,93 @@ void sched_mgb(void) {
 
 
 void sched_cg(void) {
+  // FIXME init somewhere else?
+  device_id_count_t *dc;
+  int i;
+  for(i = 0; i < NUM_GPUS; i++){
+    dc = (device_id_count_t *) malloc(sizeof(device_id_count_t));
+    dc->device_id = i;
+    dc->count = JOBS_PER_GPU;
+    avail_device_id_counts.push_back(dc);
+  }
+
+  int rc;
+  int device_id;
+  int *head_p;
+  int *tail_p;
+  struct timespec ts;
+  bemps_shm_comm_t *comm;
+
+  device_id = 0;
+  head_p = &bemps_shm_p->gen->beacon_q_head;
+  tail_p = &bemps_shm_p->gen->beacon_q_tail;
+
+  while (1) {
+    set_wakeup_time_ns(&ts);
+
+    // wait until we get a signal or time out
+    pthread_mutex_lock(&bemps_shm_p->gen->lock);
+    // TODO spurious wakeups ? shouldn't make a big difference to wake up
+    // randomly from time to time before the batch is ready
+    rc = pthread_cond_timedwait(&bemps_shm_p->gen->cond,
+                                &bemps_shm_p->gen->lock, &ts);
+    BEMPS_SCHED_LOG("rc from timedwait: " << rc << "\n");
+    BEMPS_SCHED_LOG("strerror of rc: " << strerror(rc) << "\n");
+    pthread_mutex_unlock(&bemps_shm_p->gen->lock);
+
+    BEMPS_SCHED_LOG("Woke up\n");
+
+    // catch the scheduler's tail back up with the beacon queue's head
+    while (*tail_p != *head_p) {
+      BEMPS_SCHED_LOG("*tail_p: " << (*tail_p) << "\n");
+      BEMPS_SCHED_LOG("*head_p: " << (*head_p) << "\n");
+
+      comm = &bemps_shm_p->comm[*tail_p];
+      while (comm->state != BEMPS_BEACON_STATE_BEACON_FIRED_E) {
+        // TODO probably want to track a stat for this case
+        BEMPS_SCHED_LOG("WARNING: Scheduler hit a beacon before FIRED "
+                        << "was set. (Not a bug, but unless we're "
+                        << "flooded with beacons, this should be rare."
+                        << "\n");
+        // FIXME sync shouldn't hurt, but may not help?
+        __sync_synchronize();
+      }
+
+      if (comm->exit_flag) {
+        dc = pid_to_device_id_counts[comm->pid];
+        BEMPS_SCHED_LOG("pid(" << comm->pid << ") exiting.\n");
+        BEMPS_SCHED_LOG("recycling device_id(" << dc->device_id << ").\n");
+        dc->count++;
+        assert(dc->count <= JOBS_PER_GPU); // error could mean problem with driver
+        avail_device_id_counts.sort(avail_devices_compare);
+        pid_to_device_id_counts.erase(comm->pid);
+        comm->exit_flag = 0;
+      } else {
+        if (pid_to_device_id_counts.find(comm->pid) == pid_to_device_id_counts.end()) {
+          // Not found: We're seeing this pid for the first time.
+          // This should be a proper beacon (not a free)
+          assert(comm->beacon.mem_B > 0);
+          dc = avail_device_id_counts.front();
+          dc->count--;
+          assert(dc->count >= 0); // error could mean a problem with driver
+          avail_device_id_counts.sort(avail_devices_compare);
+          pid_to_device_id_counts[comm->pid] = dc;
+        } else {
+          // Found: Do nothing.
+          // assert that at least one process (the one that sent this beacon)
+          // is assigned to this device (i.e. count should be < max)
+          assert(pid_to_device_id_counts[comm->pid]->count < JOBS_PER_GPU);
+        }
+
+        comm->state = BEMPS_BEACON_STATE_SCHEDULER_READ_E;
+        comm->sched_notif.device_id = pid_to_device_id_counts[comm->pid]->device_id;
+        comm->state = BEMPS_BEACON_STATE_SCHEDULED_E;
+        sem_post(&comm->sched_notif.sem);
+      }
+
+      *tail_p = (*tail_p + 1) & (BEMPS_BEACON_BUF_SZ - 1);
+    }
+  }
 }
 
 
@@ -498,8 +614,8 @@ void sched_vector(void) {
 
     // Second loop: Walk the boomers. This time handle regular beacons,
     // and attempt to assign them a device
-    // std::sort(boomers.begin(), boomers.end(), custom_compare);
-    boomers.sort(custom_compare);
+    // std::sort(boomers.begin(), boomers.end(), mem_footprint_compare);
+    boomers.sort(mem_footprint_compare);
     boomers_len = boomers.size();
     if (boomers_len > stats.max_len_boomers) {
       stats.max_len_boomers = boomers_len;
