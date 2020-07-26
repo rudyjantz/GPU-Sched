@@ -255,19 +255,24 @@ void sched_mgb(void) { // mgb = multi-gpu with beacons
       BEMPS_SCHED_LOG("First loop seeing mem_B: " << comm->beacon.mem_B
                                                   << "\n");
 
-      assert(comm->beacon.mem_B);
-      if (comm->beacon.mem_B < 0) {
-        stats.num_frees++;
 
-        BEMPS_SCHED_LOG("Received free-beacon for pid " << comm->pid << "\n");
-        tmp_dev_id = comm->sched_notif.device_id;
-        // Add (don't subtract), because mem_B is negative already
-        gpu_res_in_use[tmp_dev_id].mem_B += comm->beacon.mem_B;
-        gpu_res_in_use[tmp_dev_id].cores += comm->beacon.cores;
+      if (comm->exit_flag) {
+        BEMPS_SCHED_LOG("seeing exit flag\n");
+        comm->exit_flag = 0;
       } else {
-        stats.num_beacons++;
-        boomers.push_back(comm);
-        batch_size++;
+        assert(comm->beacon.mem_B);
+        if (comm->beacon.mem_B < 0) {
+          BEMPS_SCHED_LOG("Received free-beacon for pid " << comm->pid << "\n");
+          stats.num_frees++;
+          tmp_dev_id = comm->sched_notif.device_id;
+          // Add (don't subtract), because mem_B is negative already
+          gpu_res_in_use[tmp_dev_id].mem_B += comm->beacon.mem_B;
+          gpu_res_in_use[tmp_dev_id].cores += comm->beacon.cores;
+        } else {
+          stats.num_beacons++;
+          boomers.push_back(comm);
+          batch_size++;
+        }
       }
 
       *tail_p = (*tail_p + 1) & (BEMPS_BEACON_BUF_SZ - 1);

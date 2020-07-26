@@ -32,6 +32,7 @@ typedef struct {
   long long timestamp_ns;
   pid_t pid;
   int age;
+  int exit_flag;
   bemps_beacon_state_e state;
   bemps_beacon_t beacon;
   bemps_sched_notif_t sched_notif;
