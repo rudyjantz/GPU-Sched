@@ -433,6 +433,7 @@ void sched_cg(void) {
         avail_device_id_counts.sort(avail_devices_compare);
         pid_to_device_id_counts.erase(comm->pid);
         comm->exit_flag = 0;
+        comm->pid = 0;
       } else {
         if (pid_to_device_id_counts.find(comm->pid) == pid_to_device_id_counts.end()) {
           // Not found: We're seeing this pid for the first time.
