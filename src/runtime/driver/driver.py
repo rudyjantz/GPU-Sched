@@ -4,32 +4,37 @@ import subprocess
 import sys
 import time
 import queue
+import os
 
+
+
+def print_flush(s):
+    print(s, flush=True)
 
 
 def usage_and_exit():
     print()
     print()
-    print('Usage:')
-    print('    {} <num_processes> <workload_size> <job_size> <variation>'.format(sys.argv[0]))
+    print_flush('Usage:')
+    print_flush('    {} <num_processes> <workload_size> <job_size> <variation>'.format(sys.argv[0]))
     print()
-    print('Args:')
-    print('  num_processes: The number of worker processes for this driver.')
+    print_flush('Args:')
+    print_flush('  num_processes: The number of worker processes for this driver.')
     print()
-    print('  workload_size: The size of the workload, i.e. how long it will\n' \
+    print_flush('  workload_size: The size of the workload, i.e. how long it will\n' \
           '  run, which is based off the number of jobs that it has.')
     print()
-    print('  job_size: The size of each job within the workload.')
+    print_flush('  job_size: The size of each job within the workload.')
     print()
-    print('  variation: A number from 00-99 for the specific file/variation.')
+    print_flush('  variation: A number from 00-99 for the specific file/variation.')
     print()
-    print(HELP_NUM_PROCESSES)
+    print_flush(HELP_NUM_PROCESSES)
     print()
-    print(HELP_WORKLOAD_SIZE)
+    print_flush(HELP_WORKLOAD_SIZE)
     print()
-    print(HELP_JOB_SIZE)
+    print_flush(HELP_JOB_SIZE)
     print()
-    print(HELP_VARIATION)
+    print_flush(HELP_VARIATION)
     print()
     print()
     exit(1)
@@ -69,7 +74,7 @@ They carry the following meanings:
   - medium: 100% of the jobs are medium
   - large: 100% of the jobs are large
   - random: ~33% of the jobs are of each size (small, medium, or large)
-Here, "small", "medium", "large" refer to the max memory footprint
+Here, "small", "medium", "large" refer to the max memory footprint_flush
 possible of a given job. Job sizes:
   - small: all kernels < 10% GPU memory
   - medium: no large kernels, and at least 1 kernel with 10-50% GPU memory
@@ -93,28 +98,42 @@ def run_benchmark(cmd):
     o, e = proc.communicate()
     rc = proc.returncode
     if rc != 0:
-        print(rc)
-        print(e.decode('utf-8'))
-    #print(o.decode('utf-8'))
+        print_flush(rc)
+        print_flush(e.decode('utf-8'))
+    else:
+        print_flush('suc')
+    print_flush(o.decode('utf-8'))
+    #print_flush(e.decode('utf-8'))
 
 
 
+#def worker_main(q):
 def worker_main(q, wid):
-    print('Worker {}: Starting'.format(wid))
+    #wid = multiprocessing.current_process().id
+    #wid = os.getpid()
+    count = 0
+    print_flush('Worker {}: Starting'.format(wid))
     while True:
         try:
-            benchmark_cmd = q.get_nowait()
-            print('Worker {}: {}'.format(wid, benchmark_cmd))
+            #benchmark_cmd = q.get_nowait()
+            benchmark_cmd = q.get()
+            print_flush('Worker {}: {}'.format(wid, benchmark_cmd))
             #time.sleep(1)
             run_benchmark(benchmark_cmd)
+            print_flush("done with benchmark")
         except queue.Empty:
-            print('Worker {}: Worklist is empty.'.format(wid))
+            print_flush('Worker {}: Worklist is empty.'.format(wid))
+            if count < 1:
+                print_flush('Worker {}: Giving it another chance'.format(wid))
+                time.sleep(1)
+                count += 1
+                continue
             break
         except Exception as e:
-            print('Worker {}: Unexpected error when fetching from worklist. ' \
+            print_flush('Worker {}: Unexpected error when fetching from worklist. ' \
                   'Raising.'.format(wid))
             raise
-    print('Worker {}: Exiting normally'.format(wid))
+    print_flush('Worker {}: Exiting normally'.format(wid))
 
 
 def read_workload_into_q(q, workload_size, job_size, variation):
@@ -135,20 +154,19 @@ def parse_args():
     if job_size not in ['debug', 'small', 'medium', 'large', 'random']:
         usage_and_exit()
     variation = sys.argv[4]
-    print('Starting driver')
-    print('  num_processes: {}'.format(num_processes))
-    print('  workload_size: {}'.format(workload_size))
-    print('  job_size: {}'.format(job_size))
-    print('  variation: {}'.format(variation))
+    print_flush('Starting driver')
+    print_flush('  num_processes: {}'.format(num_processes))
+    print_flush('  workload_size: {}'.format(workload_size))
+    print_flush('  job_size: {}'.format(job_size))
+    print_flush('  variation: {}'.format(variation))
     return num_processes, workload_size, job_size, variation
 
 
 
-
+# ONE
 num_processes, workload_size, job_size, variation = parse_args()
 q = multiprocessing.Queue()
 read_workload_into_q(q, workload_size, job_size, variation)
-
 
 workers = []
 for i in range(num_processes):
@@ -156,7 +174,34 @@ for i in range(num_processes):
     workers.append(p)
     p.start()
 
-print('Main process: Waiting for workers...')
+print_flush('Main process: Waiting for workers...')
 for w in workers:
     w.join()
-print('Main process: Exiting normally.')
+print_flush('Main process: Exiting normally.')
+
+
+# TWO
+#num_processes, workload_size, job_size, variation = parse_args()
+#
+#pool = multiprocessing.Pool(processes=num_processes)
+#m = multiprocessing.Manager()
+#q = m.Queue()
+#read_workload_into_q(q, workload_size, job_size, variation)
+#workers = pool.apply_async(worker_main, (q))
+#
+##print_flush('Main process: Waiting for workers...')
+##for w in workers:
+##    w.join()
+#print_flush('Main process: Exiting normally.')
+
+
+# THREE
+#num_processes, workload_size, job_size, variation = parse_args()
+#q = multiprocessing.Queue()
+#read_workload_into_q(q, workload_size, job_size, variation)
+#
+#the_pool = multiprocessing.Pool(num_processes, worker_main, (q,))
+#the_pool.close()
+#the_pool.join()
+#
+#print_flush('Main process: Exiting normally.')
