@@ -145,7 +145,7 @@ void usage_and_exit(char *prog_name) {
   printf("\n");
   printf(
       "    where which_scheduler is one of zero, round-robin,\n"
-      "    round-robin-beacons, vector, or mgb\n");
+      "    round-robin-beacons, vector, single-assignment, cg, or mgb\n");
   printf("\n");
   printf("\n");
   exit(1);
