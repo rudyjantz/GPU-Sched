@@ -44,8 +44,7 @@ HELP_NUM_PROCESSES = """num_processes
 The number of worker processes for this driver determines the number of
 simultaneous benchmarks that are running in the expierment. This must be
 carefully chosen for each particular experiment, along with the scheduler,
-the number of GPU devices, the number of CPU cores, etc.
-"""
+the number of GPU devices, the number of CPU cores, etc."""
 
 HELP_WORKLOAD_SIZE = """workload_size
 The workload_size represents how long the job will run, which is based off the
