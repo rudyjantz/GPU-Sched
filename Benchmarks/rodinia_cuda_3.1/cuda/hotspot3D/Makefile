@@ -14,7 +14,10 @@ OUTPUT = *.out
 
 release: $(SRC)
 	$(NVCC) --cuda $(SRC) -o /tmp/3D.ii
-	$(CC) $(FLAGS) /tmp/3D.ii -o $(EXE) -I$(INCLUDE) -L$(CUDA_LIB_DIR) -L$(BEMPS_LIB_DIR) -lcudart -lm -lrt -lbemps
+	$(CC) -O1 -S -emit-llvm /tmp/3D.ii -o /tmp/3D.ll 
+	opt -load $(CHECKER_PASS) -MP /tmp/3D.ll -o /tmp/3D.ll
+	$(CC) -O1 /tmp/3D.ll -o $(EXE) -I$(INCLUDE) -L$(CUDA_LIB_DIR) -L$(WRAPPER_LIB_DIR) -lcudart -lm -lrt -lwrappers
+	# $(CC) $(FLAGS) /tmp/3D.ii -o $(EXE) -I$(INCLUDE) -L$(CUDA_LIB_DIR) -L$(BEMPS_LIB_DIR) -lcudart -lm -lrt -lbemps
 
 enum: $(SRC)
 	$(CC) $(KERNEL_DIM) $(FLAGS) -deviceemu $(SRC) -o $(EXE) -I$(INCLUDE) -L$(CUDA_LIB_DIR) 

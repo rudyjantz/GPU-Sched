@@ -22,7 +22,8 @@ endif
 
 
 backprop: backprop.o facetrain.o imagenet.o backprop_cuda.o 
-	$(CC) $(CC_FLAGS) backprop.o facetrain.o imagenet.o backprop_cuda.o -o backprop -L$(CUDA_LIB_DIR) -L$(BEMPS_LIB_DIR) -lcudart -lm -lbemps
+	$(CC) $(CC_FLAGS) backprop.o facetrain.o imagenet.o backprop_cuda.o -o backprop -L$(CUDA_LIB_DIR) -L$(WRAPPER_LIB_DIR) -lcudart -lm -lwrappers
+	# $(CC) $(CC_FLAGS) backprop.o facetrain.o imagenet.o backprop_cuda.o -o backprop -L$(CUDA_LIB_DIR) -L$(BEMPS_LIB_DIR) -lcudart -lm -lbemps
 
 %.o: %.[ch]
 	$(CC) $(CC_FLAGS) $< -c
@@ -35,7 +36,10 @@ backprop.o: backprop.c backprop.h
 
 backprop_cuda.o: backprop_cuda.cu backprop.h
 	$(NVCC) --cuda backprop_cuda.cu -o /tmp/backprop_cuda.ii
-	$(CC) $(CC_FLAGS) -Xclang -load -Xclang $(BEMPS_PASS) /tmp/backprop_cuda.ii -c
+	$(CC) $(CC_FLAGS) -S -emit-llvm /tmp/backprop_cuda.ii -o /tmp/backprop_cuda.ll
+	opt -load $(CHECKER_PASS) -MP /tmp/backprop_cuda.ll -o /tmp/backprop_cuda.ll
+	$(CC) $(CC_FLAGS) /tmp/backprop_cuda.ll -c
+	# $(CC) $(CC_FLAGS) -Xclang -load -Xclang $(BEMPS_PASS) /tmp/backprop_cuda.ii -c
 
 imagenet.o: imagenet.c backprop.h
 	$(CC) $(CC_FLAGS) imagenet.c -c
