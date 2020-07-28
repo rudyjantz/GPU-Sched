@@ -74,7 +74,7 @@ They carry the following meanings:
   - medium: 100% of the jobs are medium
   - large: 100% of the jobs are large
   - random: ~33% of the jobs are of each size (small, medium, or large)
-Here, "small", "medium", "large" refer to the max memory footprint_flush
+Here, "small", "medium", "large" refer to the max memory footprint
 possible of a given job. Job sizes:
   - small: all kernels < 10% GPU memory
   - medium: no large kernels, and at least 1 kernel with 10-50% GPU memory
