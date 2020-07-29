@@ -84,7 +84,7 @@ def parse_args():
     print_flush('Starting driver')
     print_flush('  num_processes: {}'.format(num_processes))
     print_flush('  workload_size: {}'.format(workload_size))
-    return num_processes, filename
+    return num_processes, workload_size
 
 
 
