@@ -106,20 +106,12 @@ def run_benchmark(cmd):
 
 
 
-#def worker_main(q):
-#def worker_main(q, wid):
 def worker_main(q, jobs_processed, wid):
-    #wid = multiprocessing.current_process().id
-    #wid = os.getpid()
-    #count = 0
     print_flush('Worker {}: Starting'.format(wid))
     while True:
         try:
-            #benchmark_cmd = q.get_nowait()
-            #benchmark_cmd = q.get()
             benchmark_cmd = q.get(block=True, timeout=1)
             print_flush('Worker {}: {}'.format(wid, benchmark_cmd))
-            #time.sleep(1)
             run_benchmark(benchmark_cmd)
             jobs_processed.value = jobs_processed.value + 1
             print_flush('Worker {}: done with benchmark'.format(wid))
@@ -129,13 +121,6 @@ def worker_main(q, jobs_processed, wid):
                 break
             print_flush('Worker {}: Worklist is empty. Retrying get().'.format(wid))
             print_flush('Worker {}: jobs_processed.value is {}'.format(wid, jobs_processed.value))
-            #print_flush('Worker {}: Worklist is empty.'.format(wid))
-            #if count < 1:
-            #    print_flush('Worker {}: Giving it another chance'.format(wid))
-            #    time.sleep(1)
-            #    count += 1
-            #    continue
-            #break
         except Exception as e:
             print_flush('Worker {}: Unexpected error when fetching from worklist. ' \
                   'Raising.'.format(wid))
@@ -173,50 +158,7 @@ def parse_args():
 
 
 
-# ONE
-#num_processes, workload_size, job_size, variation = parse_args()
-#q = multiprocessing.Queue()
-#read_workload_into_q(q, workload_size, job_size, variation)
-#
-#workers = []
-#for i in range(num_processes):
-#    p = multiprocessing.Process(target=worker_main, args=(q,i,))
-#    workers.append(p)
-#    p.start()
-#
-#print_flush('Main process: Waiting for workers...')
-#for w in workers:
-#    w.join()
-#print_flush('Main process: Exiting normally.')
 
-
-# TWO
-#num_processes, workload_size, job_size, variation = parse_args()
-#
-#pool = multiprocessing.Pool(processes=num_processes)
-#m = multiprocessing.Manager()
-#q = m.Queue()
-#read_workload_into_q(q, workload_size, job_size, variation)
-#workers = pool.apply_async(worker_main, (q))
-#
-##print_flush('Main process: Waiting for workers...')
-##for w in workers:
-##    w.join()
-#print_flush('Main process: Exiting normally.')
-
-
-# THREE
-#num_processes, workload_size, job_size, variation = parse_args()
-#q = multiprocessing.Queue()
-#read_workload_into_q(q, workload_size, job_size, variation)
-#
-#the_pool = multiprocessing.Pool(num_processes, worker_main, (q,))
-#the_pool.close()
-#the_pool.join()
-#
-#print_flush('Main process: Exiting normally.')
-
-# FOUR
 num_processes, workload_size, job_size, variation = parse_args()
 q = multiprocessing.Queue()
 jobs_total = read_workload_into_q(q, workload_size, job_size, variation)
@@ -227,12 +169,6 @@ for i in range(num_processes):
     p = multiprocessing.Process(target=worker_main, args=(q,jobs_processed,i,))
     workers.append(p)
     p.start()
-
-#print_flush('Main process: Waiting for jobs to complete...')
-#while True:
-#    time.sleep(1)
-#    print_flush('Main process: Jobs completed so far: {}'.format(jobs_processed.value))
-#print_flush('Main process: Exiting normally.')
 
 print_flush('Main process: Waiting for workers...')
 for w in workers:
