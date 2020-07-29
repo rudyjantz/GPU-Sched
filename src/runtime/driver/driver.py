@@ -80,10 +80,10 @@ def parse_args():
     if len(sys.argv) != 3:
         usage_and_exit()
     num_processes = int(sys.argv[1])
-    filename = sys.argv[2]
+    workload_size = sys.argv[2]
     print_flush('Starting driver')
     print_flush('  num_processes: {}'.format(num_processes))
-    print_flush('  filename: {}'.format(workload_size))
+    print_flush('  workload_size: {}'.format(workload_size))
     return num_processes, filename
 
 
