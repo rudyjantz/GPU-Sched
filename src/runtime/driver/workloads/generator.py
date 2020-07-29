@@ -4,18 +4,35 @@ import sys
 import random
 import time
 
+RODINIA_BMARK_PATH = '/home/cc/GPU-Sched/Benchmarks/rodinia_cuda_3.1/cuda/'
+RODINIA_DATA_PATH  = '/home/cc/GPU-Sched/Benchmarks/rodinia_cuda_3.1/data/'
+
+
+# XXX These jobs assume a Tesla P100 PCIe 16GB GPU, and classify as follows:
+#     small:  < 1.GB
+#     medium: 1.6GB - 8GB
+#     large:  > 8GB
 small_jobs = [
-    'a',
-    'b',
+    'b+tree.out file {}/b+tree/mil.txt command {}/b+tree/command.txt'.format(RODINIA_DATA_PATH, RODINIA_DATA_PATH), # 16571432 B and 20523432 B
+    'b+tree.out file {}/b+tree/mil_gt.txt command {}/b+tree/command_gt.txt'.format(RODINIA_DATA_PATH, RODINIA_DATA_PATH), # 210834320 B and 204407160 B
+    'backprop/backprop 4194304', #  589299988 B
+    'backprop/backprop 8388608', # 1176502548 B
+    'hotspot3D/3D 512 64 1000 {}/hotspot3D/power_512x64 {}/hotspot3D/temp_512x64 output.out'.format(RODINIA_DATA_PATH, RODINIA_DATA_PATH), # 201326592 B
+    'particlefilter/particlefilter_naive -x 128 -y 128 -z 10 -np 1000000', # 48000000 B
+    'srad/srad_v2/srad 2048 2048 0 127 0 127 0.5 2', # 100663296 B
+    'srad/srad_v2/srad 4096 4096 0 127 0 127 0.5 2', # 402653184 B
 ]
 medium_jobs = [
-    'c',
-    'd',
+    'backprop/backprop 16777216', # 2350907668 B
+    'backprop/backprop 33554432', # 4699717908 B
+    'srad/srad_v2/srad 8192 8192 0 127 0 127 0.5 2', # 1610612736 B
 ]
 large_jobs = [
-    'e',
-    'f'
+    'backprop/backprop 67108864', # 9397338388 B
+    'srad/srad_v2/srad 16384 16384 0 127 0 127 0.5 2', # 6442450944 B
+    'srad/srad_v2/srad 32768 32768 0 127 0 127 0.5 2', # 25769803776 B, but seems halved to 12GB
 ]
+
 
 job_size_to_jobs = {
     'small': small_jobs,
@@ -28,7 +45,6 @@ job_bufs = [
     medium_jobs,
     large_jobs
 ]
-
 
 
 
@@ -120,7 +136,8 @@ else:
 
 fp = open(output_filename, 'w')
 for j in workload:
-    print(j)
-    fp.write(j+'\n')
+    full_cmd = RODINIA_BMARK_PATH + j
+    print(full_cmd)
+    fp.write(full_cmd+'\n')
 fp.close()
 print('\nJobs written to {}\n'.format(output_filename))
