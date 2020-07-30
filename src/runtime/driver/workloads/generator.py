@@ -13,8 +13,8 @@ RODINIA_DATA_PATH  = '/home/cc/GPU-Sched/Benchmarks/rodinia_cuda_3.1/data'
 #     medium: 1.6GB - 8GB
 #     large:  > 8GB
 small_jobs = [
-    'b+tree.out file {}/b+tree/mil.txt command {}/b+tree/command.txt'.format(RODINIA_DATA_PATH, RODINIA_DATA_PATH), # 16571432 B and 20523432 B
-    'b+tree.out file {}/b+tree/mil_gt.txt command {}/b+tree/command_gt.txt'.format(RODINIA_DATA_PATH, RODINIA_DATA_PATH), # 210834320 B and 204407160 B
+    'b+tree/b+tree.out file {}/b+tree/mil.txt command {}/b+tree/command.txt'.format(RODINIA_DATA_PATH, RODINIA_DATA_PATH), # 16571432 B and 20523432 B
+    'b+tree/b+tree.out file {}/b+tree/mil_gt.txt command {}/b+tree/command_gt.txt'.format(RODINIA_DATA_PATH, RODINIA_DATA_PATH), # 210834320 B and 204407160 B
     'backprop/backprop 4194304', #  589299988 B
     'backprop/backprop 8388608', # 1176502548 B
     'hotspot3D/3D 512 64 1000 {}/hotspot3D/power_512x64 {}/hotspot3D/temp_512x64 {}/hotspot3D/output.out'.format(RODINIA_DATA_PATH, RODINIA_DATA_PATH), # 201326592 B
