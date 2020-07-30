@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <iostream>
+#include <fstream>
 #include <map>
 #include <list>
 #include <queue>
@@ -201,14 +202,23 @@ void consume_beacon(bemps_beacon_t *beacon_p) {
 }
 
 void dump_stats(void) {
+#define STATS_LOG(str)    \
+  do {                    \
+    stats_file << str;    \
+    stats_file.flush();   \
+    BEMPS_SCHED_LOG(str); \
+  } while (0)
+  std::ofstream stats_file;
+  stats_file.open ("sched-stats.out");
   BEMPS_SCHED_LOG("Caught interrupt. Exiting.\n");
-  BEMPS_SCHED_LOG("num_beacons: " << stats.num_beacons << "\n");
-  BEMPS_SCHED_LOG("num_frees: " << stats.num_frees << "\n");
-  BEMPS_SCHED_LOG("max_len_boomers: " << stats.max_len_boomers << "\n");
-  BEMPS_SCHED_LOG("max_age: " << stats.max_age << "\n");
-  BEMPS_SCHED_LOG("max_batch_size: " << max_batch_size << "\n");
-  BEMPS_SCHED_LOG("max_observed_batch_size: " << stats.max_observed_batch_size
+  STATS_LOG("num_beacons: " << stats.num_beacons << "\n");
+  STATS_LOG("num_frees: " << stats.num_frees << "\n");
+  STATS_LOG("max_len_boomers: " << stats.max_len_boomers << "\n");
+  STATS_LOG("max_age: " << stats.max_age << "\n");
+  STATS_LOG("max_batch_size: " << max_batch_size << "\n");
+  STATS_LOG("max_observed_batch_size: " << stats.max_observed_batch_size
                                               << "\n");
+  stats_file.close();
 }
 
 void sigint_handler(int unused) {
