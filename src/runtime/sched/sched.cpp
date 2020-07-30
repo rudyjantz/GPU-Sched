@@ -366,9 +366,10 @@ void sched_mgb(void) {
       long curr_min_cores = LONG_MAX;
       int target_dev_id = 0;
       for (tmp_dev_id = 0; tmp_dev_id < NUM_GPUS; tmp_dev_id++) {
-        BEMPS_SCHED_LOG("Checking device " << tmp_dev_id << ". "
-                        << "Available bytes: " << gpu_res_in_use[tmp_dev_id].mem_B
-                        << "\n");
+        BEMPS_SCHED_LOG("Checking device " << tmp_dev_id << "\n"
+                        << "  Total avail bytes: " << GPU_RES[tmp_dev_id].mem_B << "\n"
+                        << "  In-use bytes: " << gpu_res_in_use[tmp_dev_id].mem_B << "\n"
+                        << "  Trying-to-fit bytes: " << comm->beacon.mem_B << "\n");
         if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
              GPU_RES[tmp_dev_id].mem_B)) {
           if (gpu_res_in_use[tmp_dev_id].cores < curr_min_cores) {
@@ -387,8 +388,14 @@ void sched_mgb(void) {
         comm->age++;
         boomers.push_back(comm);
       } else {
-        gpu_res_in_use[target_dev_id].mem_B += comm->beacon.mem_B;
-        gpu_res_in_use[target_dev_id].cores += comm->beacon.cores;
+        long tmp_bytes_to_add = comm->beacon.mem_B;
+        long tmp_cores_to_add = comm->beacon.cores;
+        BEMPS_SCHED_LOG("Adding " << tmp_bytes_to_add << " bytes "
+                        << "to device " << target_dev_id << "\n");
+        BEMPS_SCHED_LOG("Adding " << tmp_cores_to_add << " cores "
+                        << "to device " << target_dev_id << "\n");
+        gpu_res_in_use[target_dev_id].mem_B += tmp_bytes_to_add;
+        gpu_res_in_use[target_dev_id].cores += tmp_cores_to_add;
         BEMPS_SCHED_LOG("sem_post for pid(" << comm->pid << ") "
                                             << "on device(" << target_dev_id
                                             << ")\n");
