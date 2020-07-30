@@ -54,12 +54,14 @@ def worker_main(q, jobs_processed, wid, experiment_start_time):
             bmark_start_time = time.time()
             run_benchmark(benchmark_cmd)
             bmark_time = time.time() - bmark_start_time
-            jobs_processed.value = jobs_processed.value + 1
             print_flush('Worker {}: TOTAL_BENCHMARK_TIME {} {}'.format(wid, idx, bmark_time))
-            if jobs_processed.value == jobs_total:
-                experiment_total_time = time.time() - experiment_start_time
-                print_flush('Worker {}: TOTAL_EXPERIMENT_TIME {}'.format(wid, experiment_total_time))
-                break
+            with jobs_processed.get_lock():
+                jobs_processed.value += 1
+                if jobs_processed.value == jobs_total:
+                    experiment_total_time = time.time() - experiment_start_time
+                    print_flush('Worker {}: TOTAL_EXPERIMENT_TIME {}'.format(wid, experiment_total_time))
+                    print_flush('Worker {}: Exiting normally'.format(wid))
+                    return
         except queue.Empty:
             if jobs_processed.value == jobs_total:
                 print_flush('Worker {}: Worklist is empty.'.format(wid))
