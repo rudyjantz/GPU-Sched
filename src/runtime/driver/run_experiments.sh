@@ -23,8 +23,8 @@ RESULTS_PATH=results
 
 
 WORKLOADS=(
-    debug_02.wl
-    #small_16jobs_0.wl
+    #debug_02.wl
+    small_16jobs_0.wl
     #small_16jobs_1.wl
     #medium_16jobs_0.wl
     #medium_16jobs_1.wl
@@ -71,7 +71,7 @@ for SCHED_ALG in "${!SCHED_ALG_TO_NUM_PROCS[@]}"; do
         sleep 1 # maybe a good idea before moving sched-stats.out
         mv ./sched-stats.out ${EXPERIMENT_BASENAME}.sched-stats
 
-        echo "Completed experiment for ${EXPERIMENT_BASENAME}. See ${RESULTS_PATH}"
+        echo "Completed experiment for ${EXPERIMENT_BASENAME}"
     done
 done
 
