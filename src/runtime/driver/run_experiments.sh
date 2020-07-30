@@ -52,22 +52,24 @@ for SCHED_ALG in "${!SCHED_ALG_TO_NUM_PROCS[@]}"; do
         ${BEMPS_SCHED_PATH}/bemps_sched ${SCHED_ALG} \
           &> ${EXPERIMENT_BASENAME}.sched-log &
         SCHED_PID=$!
+        echo "Scheduler is running with pid ${SCHED_PID}"
 
         echo "Launching workoader for ${EXPERIMENT_BASENAME} with ${NUM_PROCESSES} processes"
         ${WORKLOADER_PATH}/workloader.py \
           ${NUM_PROCESSES} \
           ${WORKLOADS_PATH}/${WORKLOAD}  \
-          &> ${EXPERIMENT_BASENAME}.workloader-log
+          &> ${EXPERIMENT_BASENAME}.workloader-log &
         WORKLOADER_PID=$!
+        echo "Workloader is running with pid ${WORKLOADER_PID}"
 
-        echo "Waiting for workload to complete"
+        echo "Waiting for workloader to complete"
         wait ${WORKLOADER_PID}
 
-        echo "Workload done."
-        echo "Killing scheduler with pid "${SCHED_PID}
+        echo "Workloader done"
+        echo "Killing scheduler"
         kill -2 ${SCHED_PID}
         sleep 1 # maybe a good idea before moving sched-stats.out
-        mv ${BEMPS_SCHED_PATH}/sched-stats.out ${EXPERIMENT_BASENAME}.sched-stats
+        mv ./sched-stats.out ${EXPERIMENT_BASENAME}.sched-stats
 
         echo "Completed experiment for ${EXPERIMENT_BASENAME}. See ${RESULTS_PATH}"
     done
