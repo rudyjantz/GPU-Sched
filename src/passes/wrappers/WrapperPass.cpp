@@ -138,13 +138,13 @@ static RegisterPass<WrapperPass> X("WP", "WrapperPass", false, false);
 
 #else
 
-static void registerMP(const PassManagerBuilder &,
+static void registerWP(const PassManagerBuilder &,
                        legacy::PassManagerBase &PM) {
-  PM.add(new MallocPass());
+  PM.add(new WrapperPass());
 }
 
 // Use EP_OptimizerLast to make sure the pass is run after all other
 // optimization passes, such that the debug data is not removed by others
 static RegisterStandardPasses RegisterMyPass(
-    PassManagerBuilder::EP_EarlyAsPossible, registerMP);
+    PassManagerBuilder::EP_OptimizerLast, registerWP);
 #endif

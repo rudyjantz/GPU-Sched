@@ -236,6 +236,7 @@ static inline void _reset_comm(bemps_shm_comm_t *comm) {
   comm->timestamp_ns = 0L;
   comm->pid = 0;
   comm->age = 0;
+  comm->exit_flag = 0;
   comm->state = BEMPS_BEACON_STATE_COMPLETED_E;
   comm->beacon.mem_B = 0;
   comm->beacon.cores = 0;
@@ -346,6 +347,29 @@ void bemps_free(int bemps_tid) {
 }
 }
 
+
+void _send_beacon_at_exit(void)
+{
+  int orig_beacon_q_idx;
+  int exit_beacon_q_idx;
+  bemps_shm_comm_t *comm;
+
+  BEMPS_LOG("pid(" << pid << ") "
+                   << "setting exit_flag to 1"
+                   << "\n");
+
+  exit_beacon_q_idx = _inc_head(&bemps_shm.gen->beacon_q_head);
+  comm = &bemps_shm.comm[exit_beacon_q_idx];
+  comm->pid = pid;
+  comm->exit_flag = 1;
+
+  // XXX This should be the last field that we change in the comm structure,
+  // because it's used for gating the scheduler and preventing races.
+  comm->state = BEMPS_BEACON_STATE_BEACON_FIRED_E;
+
+}
+
+
 int bemps_init(void) {
   int fd;
   int err;
@@ -378,6 +402,8 @@ int bemps_init(void) {
   BEMPS_LOG("pid:                 " << pid << "\n");
   BEMPS_LOG("bemps_shm.gen:       " << bemps_shm.gen << "\n");
   BEMPS_LOG("bemps_shm.comm:      " << bemps_shm.comm << "\n");
+
+  atexit(_send_beacon_at_exit);
 
   return 0;
 }

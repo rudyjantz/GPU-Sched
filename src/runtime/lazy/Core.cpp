@@ -54,6 +54,7 @@ cudaError_t Runtime::prepare() {
 cudaError_t Runtime::free(void* ptr) {
   ActiveObjects.erase((uint64_t)ptr);
   if (ActiveObjects.empty()) enableIssue();
+  std::cerr << "perform cudaFree (toIssue for next kernel launch: " << issue << ")\n";
   return cudaFree(ptr);
 }
 

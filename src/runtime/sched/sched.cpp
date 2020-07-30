@@ -4,9 +4,12 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <limits.h>
 
 #include <algorithm>
 #include <iostream>
+#include <fstream>
+#include <map>
 #include <list>
 #include <queue>
 
@@ -16,6 +19,7 @@
 
 #define SCHED_DEFAULT_BATCH_SIZE 1
 #define SCHED_VECTOR_BATCH_SIZE 10
+#define SCHED_MGB_BATCH_SIZE    10
 
 // Based on nvidia-smi
 const long TESLA_K80_TOTAL_MEM_KB = 11441L * 1024;
@@ -80,6 +84,9 @@ typedef enum {
   SCHED_ALG_ROUND_ROBIN_E,
   SCHED_ALG_ROUND_ROBIN_BEACONS_E,
   SCHED_ALG_VECTOR_E,
+  SCHED_ALG_SINGLE_ASSIGNMENT_E,
+  SCHED_ALG_CG_E,
+  SCHED_ALG_MGB_E
 } sched_alg_e;
 
 struct gpu_res_s {
@@ -94,6 +101,32 @@ typedef struct {
   int max_age;
   int max_observed_batch_size;
 } sched_stats_t;
+
+//
+// single-assignment scheduler
+//
+std::map<pid_t, int> pid_to_device_id;
+std::vector<int> avail_device_ids;
+
+
+//
+// C:G scheduler
+//
+
+// Number of CPU cores producing work for 1 GPU
+// FIXME This nasty, though, because the workload driver has to match this
+// exactly (or you'll get an error in the scheduler due to no available device)
+#define CORE_TO_GPU_RATIO 6
+#define JOBS_PER_GPU      CORE_TO_GPU_RATIO // ...renaming as num jobs per GPU
+
+typedef struct {
+    int device_id;
+    int count;
+} device_id_count_t;
+std::map<pid_t, device_id_count_t *> pid_to_device_id_counts;
+std::list<device_id_count_t *> avail_device_id_counts;
+
+
 
 bemps_shm_t *bemps_shm_p;
 sched_stats_t stats;
@@ -113,7 +146,7 @@ void usage_and_exit(char *prog_name) {
   printf("\n");
   printf(
       "    where which_scheduler is one of zero, round-robin,\n"
-      "    round-robin-beacons, or vector\n");
+      "    round-robin-beacons, vector, single-assignment, cg, or mgb\n");
   printf("\n");
   printf("\n");
   exit(1);
@@ -169,14 +202,23 @@ void consume_beacon(bemps_beacon_t *beacon_p) {
 }
 
 void dump_stats(void) {
+#define STATS_LOG(str)    \
+  do {                    \
+    stats_file << str;    \
+    stats_file.flush();   \
+    BEMPS_SCHED_LOG(str); \
+  } while (0)
+  std::ofstream stats_file;
+  stats_file.open ("sched-stats.out");
   BEMPS_SCHED_LOG("Caught interrupt. Exiting.\n");
-  BEMPS_SCHED_LOG("num_beacons: " << stats.num_beacons << "\n");
-  BEMPS_SCHED_LOG("num_frees: " << stats.num_frees << "\n");
-  BEMPS_SCHED_LOG("max_len_boomers: " << stats.max_len_boomers << "\n");
-  BEMPS_SCHED_LOG("max_age: " << stats.max_age << "\n");
-  BEMPS_SCHED_LOG("max_batch_size: " << max_batch_size << "\n");
-  BEMPS_SCHED_LOG("max_observed_batch_size: " << stats.max_observed_batch_size
+  STATS_LOG("num_beacons: " << stats.num_beacons << "\n");
+  STATS_LOG("num_frees: " << stats.num_frees << "\n");
+  STATS_LOG("max_len_boomers: " << stats.max_len_boomers << "\n");
+  STATS_LOG("max_age: " << stats.max_age << "\n");
+  STATS_LOG("max_batch_size: " << max_batch_size << "\n");
+  STATS_LOG("max_observed_batch_size: " << stats.max_observed_batch_size
                                               << "\n");
+  stats_file.close();
 }
 
 void sigint_handler(int unused) {
@@ -185,7 +227,7 @@ void sigint_handler(int unused) {
   exit(0);
 }
 
-struct CustomCompare {
+struct MemFootprintCompare {
   bool operator()(const bemps_shm_comm_t *lhs, const bemps_shm_comm_t *rhs) {
     // sort in increasing order. priority queue .top() and pop() will
     // therefore return the largest values
@@ -200,7 +242,316 @@ struct CustomCompare {
     // sort in increasing order. iterate with index. use back() and pop_back()
     // return lhs->beacon.mem_B < rhs->beacon.mem_B;
   }
-} custom_compare;
+} mem_footprint_compare;
+
+struct AvailDevicesCompare {
+  bool operator()(const device_id_count_t *lhs, const device_id_count_t *rhs) {
+    // sort in decreasing order. iterate with index.
+    return lhs->count > rhs->count;
+  }
+} avail_devices_compare;
+
+
+// Our custom scheduler, multi-GPU with beacons
+void sched_mgb(void) {
+  int tmp_dev_id;
+  int *head_p;
+  int *tail_p;
+  int assigned;
+  struct timespec ts;
+  int boomers_len;
+  int i;
+  bemps_shm_comm_t *comm;
+  int batch_size;
+
+  head_p = &bemps_shm_p->gen->beacon_q_head;
+  tail_p = &bemps_shm_p->gen->beacon_q_tail;
+
+  while (1) {
+    set_wakeup_time_ns(&ts);
+
+    // wait until we get a signal or time out
+    pthread_mutex_lock(&bemps_shm_p->gen->lock);
+    // TODO spurious wakeups ? shouldn't make a big difference to wake up
+    // randomly from time to time before the batch is ready
+    pthread_cond_timedwait(&bemps_shm_p->gen->cond, &bemps_shm_p->gen->lock,
+                           &ts);
+    pthread_mutex_unlock(&bemps_shm_p->gen->lock);
+
+    // First loop: Catch the scheduler's tail back up with the beacon
+    // queue's head. If we see a free-beacon, then reclaim that resource.
+    BEMPS_SCHED_LOG("*head_p: " << (*head_p) << "\n");
+    BEMPS_SCHED_LOG("*tail_p: " << (*tail_p) << "\n");
+    batch_size = 0;
+    while (*tail_p != *head_p) {
+      BEMPS_SCHED_LOG("*tail_p: " << (*tail_p) << "\n");
+
+      comm = &bemps_shm_p->comm[*tail_p];
+      while (comm->state != BEMPS_BEACON_STATE_BEACON_FIRED_E) {
+        // TODO probably want to track a stat for this case
+        BEMPS_SCHED_LOG("WARNING: Scheduler hit a beacon before FIRED "
+                        << "was set. (Not a bug, but unless we're "
+                        << "flooded with beacons, this should be rare."
+                        << "\n");
+        BEMPS_SCHED_LOG("WARNING: *tail_p: " << (*tail_p) << "\n");
+        // FIXME sync shouldn't hurt, but may not help?
+        __sync_synchronize();
+      }
+
+      if (comm->exit_flag) {
+        BEMPS_SCHED_LOG("seeing exit flag\n");
+        comm->exit_flag = 0;
+      } else {
+        assert(comm->beacon.mem_B);
+        BEMPS_SCHED_LOG("First loop seeing mem_B: " << comm->beacon.mem_B
+                                                    << "\n");
+        if (comm->beacon.mem_B < 0) {
+          BEMPS_SCHED_LOG("Received free-beacon for pid " << comm->pid << "\n");
+          stats.num_frees++;
+          tmp_dev_id = comm->sched_notif.device_id;
+          // Add (don't subtract), because mem_B is negative already
+          gpu_res_in_use[tmp_dev_id].mem_B += comm->beacon.mem_B;
+          gpu_res_in_use[tmp_dev_id].cores += comm->beacon.cores;
+        } else {
+          stats.num_beacons++;
+          boomers.push_back(comm);
+          batch_size++;
+        }
+      }
+
+      *tail_p = (*tail_p + 1) & (BEMPS_BEACON_BUF_SZ - 1);
+    }
+
+    if (batch_size > stats.max_observed_batch_size) {
+      stats.max_observed_batch_size = batch_size;
+    }
+
+    // Second loop: Walk the boomers. This time handle regular beacons, and
+    // attempt to assign them to a device. The boomers are sorted by memory
+    // footprint, highest to lowest.
+    boomers.sort(mem_footprint_compare);
+    boomers_len = boomers.size();
+    if (boomers_len > stats.max_len_boomers) {
+      stats.max_len_boomers = boomers_len;
+    }
+    BEMPS_SCHED_LOG("boomers_len: " << boomers_len << "\n");
+    for (i = 0; i < boomers_len; i++) {
+      assigned = 0;
+      comm = boomers.front();
+      boomers.pop_front();
+
+      if (comm->age > stats.max_age) {
+        stats.max_age = comm->age;
+      }
+
+      // The target device for a process must have memory available for it,
+      // and it should be the device with the least cores currently in use.
+      long curr_min_cores = LONG_MAX;
+      int target_dev_id = 0;
+      for (tmp_dev_id = 0; tmp_dev_id < NUM_GPUS; tmp_dev_id++) {
+        if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
+             GPU_RES[tmp_dev_id].mem_B)) {
+          if (gpu_res_in_use[tmp_dev_id].cores < curr_min_cores) {
+              curr_min_cores = gpu_res_in_use[tmp_dev_id].cores;
+              target_dev_id = tmp_dev_id;
+              assigned = 1;
+          }
+        }
+      }
+
+      if (!assigned) {
+        // FIXME: need to add stats, and possibly a way to reserve a
+        // GPU to prevent starving.
+        comm->age++;
+        boomers.push_back(comm);
+      } else {
+        gpu_res_in_use[target_dev_id].mem_B += comm->beacon.mem_B;
+        gpu_res_in_use[target_dev_id].cores += comm->beacon.cores;
+        BEMPS_SCHED_LOG("sem_post for pid(" << comm->pid << ") "
+                                            << "on device(" << target_dev_id
+                                            << ")\n");
+        // FIXME Is this SCHEDULER_READ state helping at all?
+        comm->state = BEMPS_BEACON_STATE_SCHEDULER_READ_E;
+        comm->sched_notif.device_id = target_dev_id;
+        comm->state = BEMPS_BEACON_STATE_SCHEDULED_E;
+        sem_post(&comm->sched_notif.sem);
+      }
+    }
+  }
+}
+
+
+void sched_cg(void) {
+  // FIXME init somewhere else?
+  device_id_count_t *dc;
+  int i;
+  for(i = 0; i < NUM_GPUS; i++){
+    dc = (device_id_count_t *) malloc(sizeof(device_id_count_t));
+    dc->device_id = i;
+    dc->count = JOBS_PER_GPU;
+    avail_device_id_counts.push_back(dc);
+  }
+
+  int rc;
+  int device_id;
+  int *head_p;
+  int *tail_p;
+  struct timespec ts;
+  bemps_shm_comm_t *comm;
+
+  device_id = 0;
+  head_p = &bemps_shm_p->gen->beacon_q_head;
+  tail_p = &bemps_shm_p->gen->beacon_q_tail;
+
+  while (1) {
+    set_wakeup_time_ns(&ts);
+
+    // wait until we get a signal or time out
+    pthread_mutex_lock(&bemps_shm_p->gen->lock);
+    // TODO spurious wakeups ? shouldn't make a big difference to wake up
+    // randomly from time to time before the batch is ready
+    rc = pthread_cond_timedwait(&bemps_shm_p->gen->cond,
+                                &bemps_shm_p->gen->lock, &ts);
+    BEMPS_SCHED_LOG("rc from timedwait: " << rc << "\n");
+    BEMPS_SCHED_LOG("strerror of rc: " << strerror(rc) << "\n");
+    pthread_mutex_unlock(&bemps_shm_p->gen->lock);
+
+    BEMPS_SCHED_LOG("Woke up\n");
+
+    // catch the scheduler's tail back up with the beacon queue's head
+    while (*tail_p != *head_p) {
+      BEMPS_SCHED_LOG("*tail_p: " << (*tail_p) << "\n");
+      BEMPS_SCHED_LOG("*head_p: " << (*head_p) << "\n");
+
+      comm = &bemps_shm_p->comm[*tail_p];
+      while (comm->state != BEMPS_BEACON_STATE_BEACON_FIRED_E) {
+        // TODO probably want to track a stat for this case
+        BEMPS_SCHED_LOG("WARNING: Scheduler hit a beacon before FIRED "
+                        << "was set. (Not a bug, but unless we're "
+                        << "flooded with beacons, this should be rare."
+                        << "\n");
+        // FIXME sync shouldn't hurt, but may not help?
+        __sync_synchronize();
+      }
+
+      if (comm->exit_flag) {
+        dc = pid_to_device_id_counts[comm->pid];
+        BEMPS_SCHED_LOG("pid(" << comm->pid << ") exiting.\n");
+        BEMPS_SCHED_LOG("recycling device_id(" << dc->device_id << ").\n");
+        dc->count++;
+        assert(dc->count <= JOBS_PER_GPU); // error could mean problem with driver
+        avail_device_id_counts.sort(avail_devices_compare);
+        pid_to_device_id_counts.erase(comm->pid);
+        comm->exit_flag = 0;
+        comm->pid = 0;
+      } else {
+        if (pid_to_device_id_counts.find(comm->pid) == pid_to_device_id_counts.end()) {
+          // Not found: We're seeing this pid for the first time.
+          // This should be a proper beacon (not a free)
+          assert(comm->beacon.mem_B > 0);
+          dc = avail_device_id_counts.front();
+          dc->count--;
+          assert(dc->count >= 0); // error could mean a problem with driver
+          avail_device_id_counts.sort(avail_devices_compare);
+          pid_to_device_id_counts[comm->pid] = dc;
+        } else {
+          // Found: Do nothing.
+          // assert that at least one process (the one that sent this beacon)
+          // is assigned to this device (i.e. count should be < max)
+          assert(pid_to_device_id_counts[comm->pid]->count < JOBS_PER_GPU);
+        }
+
+        comm->state = BEMPS_BEACON_STATE_SCHEDULER_READ_E;
+        comm->sched_notif.device_id = pid_to_device_id_counts[comm->pid]->device_id;
+        comm->state = BEMPS_BEACON_STATE_SCHEDULED_E;
+        sem_post(&comm->sched_notif.sem);
+      }
+
+      *tail_p = (*tail_p + 1) & (BEMPS_BEACON_BUF_SZ - 1);
+    }
+  }
+}
+
+
+void sched_single_assignment(void) {
+  int rc;
+  int device_id;
+  int *head_p;
+  int *tail_p;
+  struct timespec ts;
+  bemps_shm_comm_t *comm;
+
+  // FIXME initialize this in the proper place and in a maintainable way
+  avail_device_ids.push_back(0);
+  avail_device_ids.push_back(1);
+
+  device_id = 0;
+  head_p = &bemps_shm_p->gen->beacon_q_head;
+  tail_p = &bemps_shm_p->gen->beacon_q_tail;
+
+  while (1) {
+    set_wakeup_time_ns(&ts);
+
+    // wait until we get a signal or time out
+    pthread_mutex_lock(&bemps_shm_p->gen->lock);
+    // TODO spurious wakeups ? shouldn't make a big difference to wake up
+    // randomly from time to time before the batch is ready
+    rc = pthread_cond_timedwait(&bemps_shm_p->gen->cond,
+                                &bemps_shm_p->gen->lock, &ts);
+    BEMPS_SCHED_LOG("rc from timedwait: " << rc << "\n");
+    BEMPS_SCHED_LOG("strerror of rc: " << strerror(rc) << "\n");
+    pthread_mutex_unlock(&bemps_shm_p->gen->lock);
+
+    BEMPS_SCHED_LOG("Woke up\n");
+
+    // catch the scheduler's tail back up with the beacon queue's head
+    while (*tail_p != *head_p) {
+      BEMPS_SCHED_LOG("*tail_p: " << (*tail_p) << "\n");
+      BEMPS_SCHED_LOG("*head_p: " << (*head_p) << "\n");
+
+      comm = &bemps_shm_p->comm[*tail_p];
+      while (comm->state != BEMPS_BEACON_STATE_BEACON_FIRED_E) {
+        // TODO probably want to track a stat for this case
+        BEMPS_SCHED_LOG("WARNING: Scheduler hit a beacon before FIRED "
+                        << "was set. (Not a bug, but unless we're "
+                        << "flooded with beacons, this should be rare."
+                        << "\n");
+        // FIXME sync shouldn't hurt, but may not help?
+        __sync_synchronize();
+      }
+
+      if (comm->exit_flag) {
+        BEMPS_SCHED_LOG("pid(" << comm->pid << ") exiting.\n");
+        BEMPS_SCHED_LOG("recycling device_id(" << pid_to_device_id[comm->pid]
+                        << ").\n");
+        avail_device_ids.push_back(pid_to_device_id[comm->pid]);
+        pid_to_device_id.erase(comm->pid);
+        comm->exit_flag = 0;
+        comm->pid = 0;
+      } else {
+        if (pid_to_device_id.find(comm->pid) == pid_to_device_id.end()) {
+          // Not found: We're seeing this pid for the first time.
+          // This should be a proper beacon (not a free)
+          assert(comm->beacon.mem_B > 0);
+          // No avail device could mean there's an issue with the driver
+          assert(avail_device_ids.size() > 0);
+          pid_to_device_id[comm->pid] = avail_device_ids.back();
+          avail_device_ids.pop_back();
+        } else {
+          // Found: Do nothing.
+        }
+
+        comm->state = BEMPS_BEACON_STATE_SCHEDULER_READ_E;
+        comm->sched_notif.device_id = pid_to_device_id[comm->pid];
+        comm->state = BEMPS_BEACON_STATE_SCHEDULED_E;
+        sem_post(&comm->sched_notif.sem);
+      }
+
+      *tail_p = (*tail_p + 1) & (BEMPS_BEACON_BUF_SZ - 1);
+    }
+  }
+}
+
 
 void sched_vector(void) {
   int tmp_dev_id;
@@ -279,8 +630,8 @@ void sched_vector(void) {
 
     // Second loop: Walk the boomers. This time handle regular beacons,
     // and attempt to assign them a device
-    // std::sort(boomers.begin(), boomers.end(), custom_compare);
-    boomers.sort(custom_compare);
+    // std::sort(boomers.begin(), boomers.end(), mem_footprint_compare);
+    boomers.sort(mem_footprint_compare);
     boomers_len = boomers.size();
     if (boomers_len > stats.max_len_boomers) {
       stats.max_len_boomers = boomers_len;
@@ -296,10 +647,12 @@ void sched_vector(void) {
       }
 
       for (tmp_dev_id = 0; tmp_dev_id < NUM_GPUS; tmp_dev_id++) {
-        if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
+        /*if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
              GPU_RES[tmp_dev_id].mem_B) &&
             ((gpu_res_in_use[tmp_dev_id].cores + comm->beacon.cores) <
-             GPU_RES[tmp_dev_id].cores)) {
+             GPU_RES[tmp_dev_id].cores)) {*/
+        if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
+             GPU_RES[tmp_dev_id].mem_B)) {
           gpu_res_in_use[tmp_dev_id].mem_B += comm->beacon.mem_B;
           gpu_res_in_use[tmp_dev_id].cores += comm->beacon.cores;
           assigned = 1;
@@ -370,10 +723,12 @@ void sched_round_robin(void) {
       }
 
       while (1) {
-        if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
+        /*if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
              GPU_RES[tmp_dev_id].mem_B) &&
             ((gpu_res_in_use[tmp_dev_id].cores + comm->beacon.cores) <
-             GPU_RES[tmp_dev_id].cores)) {
+             GPU_RES[tmp_dev_id].cores)) {*/
+        if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
+             GPU_RES[tmp_dev_id].mem_B)) {
           gpu_res_in_use[tmp_dev_id].mem_B += comm->beacon.mem_B;
           gpu_res_in_use[tmp_dev_id].cores += comm->beacon.cores;
           assigned = 1;
@@ -444,7 +799,7 @@ void sched_round_robin(void) {
     BEMPS_SCHED_LOG("*tail_p: " << (*tail_p) << "\n");
     BEMPS_SCHED_LOG("bcn_idx: " << (bcn_idx) << "\n");
     while (bcn_idx != *tail_p) {
-      BEMPS_SCHED_LOG("bcn_idx: " << (bcn_idx) << "\n");
+      BEMPS_SCHED_LOG("Second loop bcn_idx: " << (bcn_idx) << "\n");
 
       assigned = 0;
       tmp_dev_id = device_id;
@@ -457,14 +812,19 @@ void sched_round_robin(void) {
       stats.num_beacons++;
 
       while (1) {
-        if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
+        /*if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
              GPU_RES[tmp_dev_id].mem_B) &&
             ((gpu_res_in_use[tmp_dev_id].cores + comm->beacon.cores) <
-             GPU_RES[tmp_dev_id].cores)) {
+             GPU_RES[tmp_dev_id].cores)) {*/
+        if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
+             GPU_RES[tmp_dev_id].mem_B)) {
           gpu_res_in_use[tmp_dev_id].mem_B += comm->beacon.mem_B;
           gpu_res_in_use[tmp_dev_id].cores += comm->beacon.cores;
           assigned = 1;
+          BEMPS_SCHED_LOG("  assigned\n");
           break;
+        }else{
+          BEMPS_SCHED_LOG("  not assigned\n");
         }
 
         tmp_dev_id = (tmp_dev_id + 1) & (NUM_GPUS - 1);
@@ -493,6 +853,7 @@ void sched_round_robin(void) {
     }
   }
 }
+
 
 void sched_no_beacons(int is_round_robin) {
   int rc;
@@ -563,6 +924,15 @@ void sched(void) {
   } else if (which_scheduler == SCHED_ALG_VECTOR_E) {
     BEMPS_SCHED_LOG("Starting vector scheduler\n");
     sched_vector();
+  } else if (which_scheduler == SCHED_ALG_SINGLE_ASSIGNMENT_E) {
+    BEMPS_SCHED_LOG("Starting single asssignment scheduler\n");
+    sched_single_assignment();
+  } else if (which_scheduler == SCHED_ALG_CG_E) {
+    BEMPS_SCHED_LOG("Starting C:G scheduler\n");
+    sched_cg();
+  } else if (which_scheduler == SCHED_ALG_MGB_E) {
+    BEMPS_SCHED_LOG("Starting mgb scheduler\n");
+    sched_mgb();
   } else {
     fprintf(stderr, "ERROR: Invalid scheduling algorithm\n");
     exit(2);
@@ -592,6 +962,13 @@ void parse_args(int argc, char **argv) {
   } else if (strncmp(argv[1], "vector", 7) == 0) {
     which_scheduler = SCHED_ALG_VECTOR_E;
     max_batch_size = SCHED_VECTOR_BATCH_SIZE;
+  } else if (strncmp(argv[1], "single-assignment", 18) == 0) {
+    which_scheduler = SCHED_ALG_SINGLE_ASSIGNMENT_E;
+  } else if (strncmp(argv[1], "cg", 3) == 0) {
+    which_scheduler = SCHED_ALG_CG_E;
+  } else if (strncmp(argv[1], "mgb", 4) == 0) {
+    which_scheduler = SCHED_ALG_MGB_E;
+    max_batch_size = SCHED_MGB_BATCH_SIZE;
   } else {
     usage_and_exit(argv[0]);
   }
