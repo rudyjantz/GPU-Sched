@@ -45,15 +45,21 @@ def run_benchmark(cmd):
 
 
 
-def worker_main(q, jobs_processed, wid):
+def worker_main(q, jobs_processed, wid, experiment_start_time):
     print_flush('Worker {}: Starting'.format(wid))
     while True:
         try:
-            benchmark_cmd = q.get(block=True, timeout=1)
-            print_flush('Worker {}: {}'.format(wid, benchmark_cmd))
+            idx, benchmark_cmd = q.get(block=True, timeout=1)
+            print_flush('Worker {}: {} {}'.format(wid, idx, benchmark_cmd))
+            bmark_start_time = time.time()
             run_benchmark(benchmark_cmd)
+            bmark_time = time.time() - bmark_start_time
             jobs_processed.value = jobs_processed.value + 1
-            print_flush('Worker {}: done with benchmark'.format(wid))
+            print_flush('Worker {}: TOTAL_BENCHMARK_TIME {} {}'.format(wid, idx, bmark_time))
+            if jobs_processed.value == jobs_total:
+                experiment_total_time = time.time() - experiment_start_time
+                print_flush('Worker {}: TOTAL_EXPERIMENT_TIME {}'.format(wid, experiment_total_time))
+                break
         except queue.Empty:
             if jobs_processed.value == jobs_total:
                 print_flush('Worker {}: Worklist is empty.'.format(wid))
@@ -71,7 +77,7 @@ def read_workload_into_q(q, workload_file):
     count = 0
     with open(workload_file) as f:
         for line in f:
-            q.put(line.strip())
+            q.put((count, line.strip()))
             count += 1
     return count
 
@@ -88,15 +94,15 @@ def parse_args():
 
 
 
-
 num_processes, workload_file = parse_args()
 q = multiprocessing.Queue()
 jobs_total = read_workload_into_q(q, workload_file)
 jobs_processed = multiprocessing.Value('i', 0)
 
+experiment_start_time = time.time()
 workers = []
 for i in range(num_processes):
-    p = multiprocessing.Process(target=worker_main, args=(q,jobs_processed,i,))
+    p = multiprocessing.Process(target=worker_main, args=(q,jobs_processed,i,experiment_start_time,))
     workers.append(p)
     p.start()
 
