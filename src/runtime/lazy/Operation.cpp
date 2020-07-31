@@ -3,9 +3,10 @@
 #include <iostream>
 
 cudaError_t MallocOp::perform() {
-    std::cerr << "Perform Actual cudaMalloc (fake addr: " << (uint64_t *)*ptr_holder << ", size: " << devMem->size << ")\n";
+    uint64_t* fake_addr = (uint64_t *)*ptr_holder;
     cudaError_t err = cudaMalloc(ptr_holder, devMem->size);
     devMem->ptr = *ptr_holder;
+    fprintf(stderr, "Perform Actual cudaMalloc (holder: %p, fake addr: %p, valid addr: %p)\n",  ptr_holder, fake_addr, devMem->ptr); 
     return err;
 }
 

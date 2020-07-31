@@ -7,20 +7,28 @@
 static Runtime R;
 static int id = 0;
 
+static bool is_fake_addr(void *ptr) {
+  return (uint64_t)ptr >= 0xffff800000000000; 
+}
+
 extern "C" cudaError_t cudaMallocWrapper(void** devPtr, size_t size) {
   R.registerMallocOp(devPtr, size);
-  fprintf(stderr, "delay a cudaMalloc (fake addr: %p)\n", *devPtr);
+  fprintf(stderr, "delay a cudaMalloc (holder: %p, fake addr: %p)\n", devPtr, *devPtr);
   return cudaSuccess;
 }
 
 extern "C" cudaError_t cudaMemcpyWrapper(void* dst, const void* src,
                                          size_t count,
                                          enum cudaMemcpyKind kind) {
-  if (kind != cudaMemcpyHostToDevice) {
+  if (kind != cudaMemcpyHostToDevice || !is_fake_addr(dst)) {
     std::cerr << "do actual cudaMemcpy for non-HostToDevice copy\n";
     return cudaMemcpy(dst, src, count, kind);
+  } else if(R.isAllocated(dst)) {
+    dst = R.getValidAddrforFakeAddr(dst);
+    fprintf(stderr, "perform cudaMemcpy for allocated HostToDevice (dst: %p, src: %p)\n", dst, src);
+    return cudaMemcpy(dst, src, count, kind);
   } else {
-    std::cerr << "delay cudaMemcpy for HostToDevice copy\n";
+    fprintf(stderr, "Delay cudaMemcpy for HostToDevice (dst: %p, src: %p)\n", dst, src);
     R.registerMemcpyOp(dst, (void*)src, count);
     return cudaSuccess;
   }
@@ -43,7 +51,7 @@ extern "C" cudaError_t cudaKernelLaunchPrepare(uint64_t gxy, int gz,
       gx, gy, gz, bx, by, bz, membytes, R.toIssue());
 
   if (R.toIssue()) {
-    bemps_begin(id, gx, gy, gz, bx, by, bz, membytes);
+    // bemps_begin(id, gx, gy, gz, bx, by, bz, membytes);
     R.disableIssue();
   }
   return R.prepare();
@@ -52,7 +60,7 @@ extern "C" cudaError_t cudaKernelLaunchPrepare(uint64_t gxy, int gz,
 extern "C" cudaError_t cudaFreeWrapper(void* devPtr) {
   cudaError_t err = R.free(devPtr);
   if (R.toIssue()) {
-    bemps_free(id);
+    // bemps_free(id);
     id++;
   }
   return err;

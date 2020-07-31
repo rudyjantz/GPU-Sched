@@ -42,7 +42,12 @@ cudaError_t Runtime::prepare() {
     }
 
   for (auto obj : Objects) {
-    ActiveObjects.insert((uint64_t)obj.second->ptr);
+    uint64_t fake_addr = obj.first;
+    uint64_t valid_addr = (uint64_t)(obj.second->ptr);
+
+    ActiveObjects.insert(valid_addr);
+    AllocatedMap[fake_addr] = valid_addr;
+    ReverseAllocatedMap[valid_addr] = fake_addr;
     delete obj.second;
   }
 
@@ -52,7 +57,11 @@ cudaError_t Runtime::prepare() {
 }
 
 cudaError_t Runtime::free(void* ptr) {
-  ActiveObjects.erase((uint64_t)ptr);
+  uint64_t valid_addr = (uint64_t)(ptr);
+  uint64_t fake_addr = ReverseAllocatedMap[valid_addr];
+  ReverseAllocatedMap.erase(valid_addr);
+  AllocatedMap.erase(fake_addr);
+  ActiveObjects.erase(valid_addr);
   if (ActiveObjects.empty()) enableIssue();
   std::cerr << "perform cudaFree (toIssue for next kernel launch: " << issue << ")\n";
   return cudaFree(ptr);

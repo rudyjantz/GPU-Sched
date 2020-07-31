@@ -1,3 +1,4 @@
+include ../../common/make.config
 # Example
 # target: dependencies
 	# command 1
@@ -9,11 +10,8 @@
 
 # link objects(binaries) together
 myocyte.out:		main.o
-	nvcc	main.o \
-				-I/usr/local/cuda/include \
-				-L/usr/local/cuda/lib \
-				-lm -lcuda -lcudart \
-                                -o myocyte.out
+	# nvcc	main.o -I/usr/local/cuda/include -L/usr/local/cuda/lib -lm -lcuda -lcudart -o myocyte.out
+	clang main.o -I/usr/local/cuda/include -L$(CUDA_LIB_DIR) -L$(LAZY_LIB_DIR) -lm -lcuda -lcudart -llazy -o myocyte.out
 
 # compile main function file into object (binary)
 main.o:	define.c \
@@ -35,8 +33,12 @@ main.o:	define.c \
 				kernel_fin_2.cu \
 				file.c \
 				timer.c
-	nvcc	main.cu \
-				-c -O3 -g
+	# nvcc	main.cu -c -O3 -g
+	nvcc -ccbin clang --cuda main.cu -o /tmp/main.ii 
+	clang -O1 -S -emit-llvm /tmp/main.ii -o /tmp/main.ll
+	opt -load $(WRAPPER_PASS) -WP /tmp/main.ll -S -o /tmp/main.ll
+	clang -c /tmp/main.ll -o main.o
+
 
 # delete all object files
 clean:
