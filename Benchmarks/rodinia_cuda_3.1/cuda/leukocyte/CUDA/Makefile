@@ -5,8 +5,10 @@ override OUTPUT = -DOUTPUT
 endif
 
 # C compiler
-CC = gcc
-CC_FLAGS = -g -O3 -Wall -I$(MATRIX_DIR)
+# CC = gcc
+CC = clang
+# CC_FLAGS = -g -O3 -Wall -I$(MATRIX_DIR)
+CC_FLAGS = -g -O1 -Wall -I$(MATRIX_DIR)
 
 # CUDA compiler
 NVCC = $(CUDA_DIR)/bin/nvcc
@@ -19,7 +21,7 @@ MATRIX_DIR = ../meschach_lib
 ifeq ($(dbg),1)
 	NVCC_FLAGS += -g -O0
 else
-	NVCC_FLAGS += -O3
+	NVCC_FLAGS += -O1
 endif
 
 # 'make emu=1' compiles the CUDA kernels for emulation
