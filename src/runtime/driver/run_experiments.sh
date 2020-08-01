@@ -24,12 +24,12 @@ RESULTS_PATH=results
 
 WORKLOADS=(
     #debug_02.wl
-    small_16jobs_0.wl
-    #small_16jobs_1.wl
-    #medium_16jobs_0.wl
-    #medium_16jobs_1.wl
-    #large_16jobs_0.wl
-    #large_16jobs_1.wl
+    #k80_small_16jobs_0.wl
+    k80_small_16jobs_1.wl
+    #k80_medium_16jobs_0.wl
+    k80_medium_16jobs_1.wl
+    #k80_large_16jobs_0.wl
+    k80_large_16jobs_1.wl
     ##random_00.wl
     ##random_01.wl
 )
@@ -37,7 +37,7 @@ WORKLOADS=(
 declare -A SCHED_ALG_TO_NUM_PROCS=(
     [single-assignment]=2
     [cg]=6
-    [mgb]=6
+    [mgb]=12
 )
 
 mkdir -p results
