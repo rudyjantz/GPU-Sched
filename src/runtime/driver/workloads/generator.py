@@ -102,7 +102,7 @@ def usage_and_exit():
     print()
     print()
     print('Usage:')
-    print('    {} <gpu> <num_jobs> <job_size> [output_filename]'.format(sys.argv[0]))
+    print('    {} <gpu> <job_size> <num_jobs> [output_filename]'.format(sys.argv[0]))
     print()
     print(HELP_GPU)
     print()
@@ -120,16 +120,16 @@ def parse_args():
     gpu = sys.argv[1]
     if gpu not in GPU_TO_MEM:
         usage_and_exit()
-    num_jobs = sys.argv[2]
-    if not num_jobs.isdigit():
-        usage_and_exit()
-    job_size = sys.argv[3]
+    job_size = sys.argv[2]
     if job_size not in ['small', 'medium', 'large', 'random']:
+        usage_and_exit()
+    num_jobs = sys.argv[3]
+    if not num_jobs.isdigit():
         usage_and_exit()
     output_filename = 'example_jobs_00.wl'
     if len(sys.argv) == 5:
         output_filename = sys.argv[4]
-    return gpu, int(num_jobs), job_size, output_filename
+    return gpu, job_size, int(num_jobs), output_filename
 
 
 def construct_job_arrays(which_gpu):
@@ -184,7 +184,7 @@ def generate_workload():
     return workload
 
 
-gpu, num_jobs, job_size, output_filename = parse_args()
+gpu, job_size, num_jobs, output_filename = parse_args()
 construct_job_arrays(gpu)
 
 if job_size == 'random':
