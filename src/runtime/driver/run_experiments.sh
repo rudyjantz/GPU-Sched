@@ -40,6 +40,7 @@ declare -A SCHED_ALG_TO_NUM_PROCS=(
     [mgb]=6
 )
 
+mkdir -p results
 
 
 for SCHED_ALG in "${!SCHED_ALG_TO_NUM_PROCS[@]}"; do
