@@ -8,10 +8,10 @@ RODINIA_BMARK_PATH = '/home/cc/GPU-Sched/Benchmarks/rodinia_cuda_3.1/cuda'
 RODINIA_DATA_PATH  = '/home/cc/GPU-Sched/Benchmarks/rodinia_cuda_3.1/data'
 
 
-# XXX These jobs assume a Tesla P100 PCIe 16GB GPU, and classify as follows:
-#     small:  < 1.GB
-#     medium: 1.6GB - 8GB
-#     large:  > 8GB
+# XXX These jobs assume a Tesla P100 PCIe 16 GB GPU, and classify as follows:
+#     small:  < 1.6 GB
+#     medium: 1.6 GB - 8 GB
+#     large:  > 8 GB
 small_jobs = [
     'b+tree/b+tree.out file {}/b+tree/mil.txt command {}/b+tree/command.txt'.format(RODINIA_DATA_PATH, RODINIA_DATA_PATH), # 16571432 B and 20523432 B
     'b+tree/b+tree.out file {}/b+tree/mil_gt.txt command {}/b+tree/command_gt.txt'.format(RODINIA_DATA_PATH, RODINIA_DATA_PATH), # 210834320 B and 204407160 B
@@ -21,11 +21,13 @@ small_jobs = [
     'particlefilter/particlefilter_naive -x 128 -y 128 -z 10 -np 1000000', # 48000000 B
     'srad/srad_v2/srad 2048 2048 0 127 0 127 0.5 2', # 100663296 B
     'srad/srad_v2/srad 4096 4096 0 127 0 127 0.5 2', # 402653184 B
+    'hotspot/hotspot 2048 2 2 {}/hotspot/gt_temp_2048 {}/hotspot/gt_power_2048 {}/hotspot/output.out'.format(RODINIA_DATA_PATH, RODINIA_DATA_PATH, RODINIA_DATA_PATH), # 50331648 B
 ]
 medium_jobs = [
     'backprop/backprop 16777216', # 2350907668 B
     'backprop/backprop 33554432', # 4699717908 B
     'srad/srad_v2/srad 8192 8192 0 127 0 127 0.5 2', # 1610612736 B
+    'lavaMD/lavaMD -boxes1d 100', # 7856000000 B
 ]
 large_jobs = [
     'backprop/backprop 67108864', # 9397338388 B
