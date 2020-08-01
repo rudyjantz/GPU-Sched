@@ -13,7 +13,7 @@ static bool is_fake_addr(void *ptr) {
 
 extern "C" cudaError_t cudaMallocWrapper(void** devPtr, size_t size) {
   R.registerMallocOp(devPtr, size);
-  fprintf(stderr, "delay a cudaMalloc (holder: %p, fake addr: %p)\n", devPtr, *devPtr);
+  // fprintf(stderr, "delay a cudaMalloc (holder: %p, fake addr: %p)\n", devPtr, *devPtr);
   return cudaSuccess;
 }
 
@@ -21,14 +21,14 @@ extern "C" cudaError_t cudaMemcpyWrapper(void* dst, const void* src,
                                          size_t count,
                                          enum cudaMemcpyKind kind) {
   if (kind != cudaMemcpyHostToDevice || !is_fake_addr(dst)) {
-    std::cerr << "do actual cudaMemcpy for non-HostToDevice copy\n";
+    // fprintf(stderr, "do actual cudaMemcpy for non-HostToDevice copy\n");
     return cudaMemcpy(dst, src, count, kind);
   } else if(R.isAllocated(dst)) {
     dst = R.getValidAddrforFakeAddr(dst);
-    fprintf(stderr, "perform cudaMemcpy for allocated HostToDevice (dst: %p, src: %p)\n", dst, src);
+    // fprintf(stderr, "perform cudaMemcpy for allocated HostToDevice (dst: %p, src: %p)\n", dst, src);
     return cudaMemcpy(dst, src, count, kind);
   } else {
-    fprintf(stderr, "Delay cudaMemcpy for HostToDevice (dst: %p, src: %p)\n", dst, src);
+    // fprintf(stderr, "Delay cudaMemcpy for HostToDevice (dst: %p, src: %p)\n", dst, src);
     R.registerMemcpyOp(dst, (void*)src, count);
     return cudaSuccess;
   }
@@ -45,13 +45,13 @@ extern "C" cudaError_t cudaKernelLaunchPrepare(uint64_t gxy, int gz,
   int by = U32Y(bxy);
   int64_t membytes = R.getAggMemSize();
 
-  printf(
-      "A new kernel launch: \n\tgx: %d, gy: %d, gz: %d, bx: %d, by: %d, bz: "
-      "%d, mem: %ld, toIssue: %d\n",
-      gx, gy, gz, bx, by, bz, membytes, R.toIssue());
+  // printf(
+      // "A new kernel launch: \n\tgx: %d, gy: %d, gz: %d, bx: %d, by: %d, bz: "
+  //     "%d, mem: %ld, toIssue: %d\n",
+  //     gx, gy, gz, bx, by, bz, membytes, R.toIssue());
 
   if (R.toIssue()) {
-    // bemps_begin(id, gx, gy, gz, bx, by, bz, membytes);
+    bemps_begin(id, gx, gy, gz, bx, by, bz, membytes);
     R.disableIssue();
   }
   return R.prepare();
@@ -60,7 +60,7 @@ extern "C" cudaError_t cudaKernelLaunchPrepare(uint64_t gxy, int gz,
 extern "C" cudaError_t cudaFreeWrapper(void* devPtr) {
   cudaError_t err = R.free(devPtr);
   if (R.toIssue()) {
-    // bemps_free(id);
+    bemps_free(id);
     id++;
   }
   return err;

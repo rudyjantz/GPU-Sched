@@ -63,7 +63,7 @@ cudaError_t Runtime::free(void* ptr) {
   AllocatedMap.erase(fake_addr);
   ActiveObjects.erase(valid_addr);
   if (ActiveObjects.empty()) enableIssue();
-  std::cerr << "perform cudaFree (toIssue for next kernel launch: " << issue << ")\n";
+  // std::cerr << "perform cudaFree (toIssue for next kernel launch: " << issue << ")\n";
   return cudaFree(ptr);
 }
 
