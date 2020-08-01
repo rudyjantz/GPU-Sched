@@ -53,8 +53,11 @@ def worker_main(q, jobs_processed, wid, experiment_start_time):
             print_flush('Worker {}: {} {}'.format(wid, idx, benchmark_cmd))
             bmark_start_time = time.time()
             run_benchmark(benchmark_cmd)
-            bmark_time = time.time() - bmark_start_time
+            bmark_end_time = time.time()
+            bmark_time = bmark_end_time - bmark_start_time
+            time_since_start = bmark_end_time - experiment_start_time
             print_flush('Worker {}: TOTAL_BENCHMARK_TIME {} {}'.format(wid, idx, bmark_time))
+            print_flush('Worker {}: TIME_SINCE_START     {} {}'.format(wid, idx, time_since_start))
             with jobs_processed.get_lock():
                 jobs_processed.value += 1
                 if jobs_processed.value == jobs_total:
