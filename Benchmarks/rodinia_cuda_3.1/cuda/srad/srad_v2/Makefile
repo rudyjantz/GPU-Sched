@@ -2,7 +2,7 @@ include ../../../common/make.config
 
 BEMPS_BUILD_DIR = $(abspath ../../../../../build)
 BEMPS_LIB_DIR = $(BEMPS_BUILD_DIR)/runtime/bemps
-BEMPS_PASS = $(BEMPS_BUILD_DIR)/pass/libGPUBeaconPass.so
+BEMPS_PASS = $(BEMPS_BUILD_DIR)/passes/analysis/libGPUBeaconPass.so
 
 NVCC := $(CUDA_DIR)/bin/nvcc
 CC := clang
