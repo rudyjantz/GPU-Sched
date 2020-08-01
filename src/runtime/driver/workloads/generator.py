@@ -8,32 +8,52 @@ RODINIA_BMARK_PATH = '/home/cc/GPU-Sched/Benchmarks/rodinia_cuda_3.1/cuda'
 RODINIA_DATA_PATH  = '/home/cc/GPU-Sched/Benchmarks/rodinia_cuda_3.1/data'
 
 
-# XXX These jobs assume a Tesla P100 PCIe 16 GB GPU, and classify as follows:
-#     small:  < 1.6 GB
-#     medium: 1.6 GB - 8 GB
-#     large:  > 8 GB
-small_jobs = [
-    'b+tree/b+tree.out file {}/b+tree/mil.txt command {}/b+tree/command.txt'.format(RODINIA_DATA_PATH, RODINIA_DATA_PATH), # 16571432 B and 20523432 B
-    'b+tree/b+tree.out file {}/b+tree/mil_gt.txt command {}/b+tree/command_gt.txt'.format(RODINIA_DATA_PATH, RODINIA_DATA_PATH), # 210834320 B and 204407160 B
-    'backprop/backprop 4194304', #  589299988 B
-    'backprop/backprop 8388608', # 1176502548 B
-    'hotspot3D/3D 512 64 1000 {}/hotspot3D/power_512x64 {}/hotspot3D/temp_512x64 {}/hotspot3D/output.out'.format(RODINIA_DATA_PATH, RODINIA_DATA_PATH, RODINIA_DATA_PATH), # 201326592 B
-    'particlefilter/particlefilter_naive -x 128 -y 128 -z 10 -np 1000000', # 48000000 B
-    'srad/srad_v2/srad 2048 2048 0 127 0 127 0.5 2', # 100663296 B
-    'srad/srad_v2/srad 4096 4096 0 127 0 127 0.5 2', # 402653184 B
-    'hotspot/hotspot 2048 2 2 {}/hotspot/gt_temp_2048 {}/hotspot/gt_power_2048 {}/hotspot/output.out'.format(RODINIA_DATA_PATH, RODINIA_DATA_PATH, RODINIA_DATA_PATH), # 50331648 B
+GPU_TO_MEM = {
+    'k80':  12 * 1024 * 1024 * 1024, # 12 GB
+    'p100': 16 * 1024 * 1024 * 1024, # 16 GB
+}
+
+
+# all_jobs is a list of tuples:
+#   (max kernel memory size, benchmark command that produces it)
+all_jobs = [
+    # ~20 MB
+    (  20523432, 'b+tree/b+tree.out file {}/b+tree/mil.txt ' \
+                 'command {}/b+tree/command.txt'.format(RODINIA_DATA_PATH,
+                                                        RODINIA_DATA_PATH)),
+    (  48000000, 'particlefilter/particlefilter_naive ' \
+                 '-x 128 -y 128 -z 10 -np 1000000'),
+    (  50331648, 'hotspot/hotspot 2048 2 2 {}/hotspot/gt_temp_2048 ' \
+                 '{}/hotspot/gt_power_2048 ' \
+                 '{}/hotspot/output.out'.format(RODINIA_DATA_PATH,
+                                                RODINIA_DATA_PATH,
+                                                RODINIA_DATA_PATH)),
+    # ~ 100 MB
+    ( 100663296, 'srad/srad_v2/srad 2048 2048 0 127 0 127 0.5 2'),
+    ( 210834320, 'b+tree/b+tree.out file {}/b+tree/mil_gt.txt command ' \
+                 '{}/b+tree/command_gt.txt'.format(RODINIA_DATA_PATH,
+                                                   RODINIA_DATA_PATH)),
+    ( 201326592, 'hotspot3D/3D 512 64 1000 {}/hotspot3D/power_512x64 ' \
+                 '{}/hotspot3D/temp_512x64 ' \
+                 '{}/hotspot3D/output.out'.format(RODINIA_DATA_PATH,
+                                                  RODINIA_DATA_PATH,
+                                                  RODINIA_DATA_PATH)),
+    ( 402653184, 'srad/srad_v2/srad 4096 4096 0 127 0 127 0.5 2'),
+    ( 589299988, 'backprop/backprop 4194304'),
+    # ~ 1 GB
+    (1176502548, 'backprop/backprop 8388608'),
+    (1610612736, 'srad/srad_v2/srad 8192 8192 0 127 0 127 0.5 2'),
+    (2350907668, 'backprop/backprop 16777216'),
+    (4699717908, 'backprop/backprop 33554432'),
+    (6442450944, 'srad/srad_v2/srad 16384 16384 0 127 0 127 0.5 2'),
+    (7856000000, 'lavaMD/lavaMD -boxes1d 100'),
+    (9397338388, 'backprop/backprop 67108864'),
+    #(25769803776, 'srad/srad_v2/srad 32768 32768 0 127 0 127 0.5 2'), # seems halved to 12GB
 ]
-medium_jobs = [
-    'backprop/backprop 16777216', # 2350907668 B
-    'backprop/backprop 33554432', # 4699717908 B
-    'srad/srad_v2/srad 8192 8192 0 127 0 127 0.5 2', # 1610612736 B
-    'lavaMD/lavaMD -boxes1d 100', # 7856000000 B
-]
-large_jobs = [
-    'backprop/backprop 67108864', # 9397338388 B
-    'srad/srad_v2/srad 16384 16384 0 127 0 127 0.5 2', # 6442450944 B
-    #'srad/srad_v2/srad 32768 32768 0 127 0 127 0.5 2', # 25769803776 B, but seems halved to 12GB
-]
+small_jobs = []
+medium_jobs = []
+large_jobs = []
+
 
 
 job_size_to_jobs = {
@@ -49,6 +69,11 @@ job_bufs = [
 ]
 
 
+HELP_GPU = """gpu
+This field represents the GPU you intend to use for the workload you're
+generating. The size of the workload ultimately depends on the capability of
+the GPU (i.e. a "small" workload for a powerful GPU may be "large" for a weak
+GPU). This field must be either "p100" or "k80"."""
 
 HELP_NUM_JOBS = """num_jobs
 The number of jobs in the workload."""
@@ -77,7 +102,9 @@ def usage_and_exit():
     print()
     print()
     print('Usage:')
-    print('    {} <num_jobs> <job_size> [output_filename]'.format(sys.argv[0]))
+    print('    {} <gpu> <num_jobs> <job_size> [output_filename]'.format(sys.argv[0]))
+    print()
+    print(HELP_GPU)
     print()
     print(HELP_NUM_JOBS)
     print()
@@ -88,18 +115,47 @@ def usage_and_exit():
 
 
 def parse_args():
-    if len(sys.argv) < 3 or len(sys.argv) > 4 :
+    if len(sys.argv) < 4 or len(sys.argv) > 5 :
         usage_and_exit()
-    num_jobs = sys.argv[1]
+    gpu = sys.argv[1]
+    if gpu not in GPU_TO_MEM:
+        usage_and_exit()
+    num_jobs = sys.argv[2]
     if not num_jobs.isdigit():
         usage_and_exit()
-    job_size = sys.argv[2]
+    job_size = sys.argv[3]
     if job_size not in ['small', 'medium', 'large', 'random']:
         usage_and_exit()
     output_filename = 'example_jobs_00.wl'
-    if len(sys.argv) == 4:
-        output_filename = sys.argv[3]
-    return int(num_jobs), job_size, output_filename
+    if len(sys.argv) == 5:
+        output_filename = sys.argv[4]
+    return gpu, int(num_jobs), job_size, output_filename
+
+
+def construct_job_arrays(which_gpu):
+    print('Constructing the job arrays...')
+    total_avail_mem  = GPU_TO_MEM[which_gpu]
+    small_threshold  = total_avail_mem * .1
+    medium_threshold = total_avail_mem * .5
+    for j in all_jobs:
+        B = j[0]
+        if B < small_threshold:
+            small_jobs.append(j[1])
+        elif B < medium_threshold:
+            medium_jobs.append(j[1])
+        else:
+            large_jobs.append(j[1])
+    print('small jobs:')
+    for j in small_jobs:
+        print('  {}'.format(j))
+    print('medium jobs:')
+    for j in medium_jobs:
+        print('  {}'.format(j))
+    print('large jobs:')
+    for j in large_jobs:
+        print('  {}'.format(j))
+    print()
+
 
 
 # Generates a workload with 1/3 small, 1/3 medium, and 1/3 large jobs.
@@ -128,7 +184,8 @@ def generate_workload():
     return workload
 
 
-num_jobs, job_size, output_filename = parse_args()
+gpu, num_jobs, job_size, output_filename = parse_args()
+construct_job_arrays(gpu)
 
 if job_size == 'random':
     workload = generate_random_workload()
@@ -136,10 +193,13 @@ else:
     workload = generate_workload()
 
 
+print('Generating the workload...')
 fp = open(output_filename, 'w')
 for j in workload:
     full_cmd = RODINIA_BMARK_PATH + '/' + j
     print(full_cmd)
     fp.write(full_cmd+'\n')
 fp.close()
-print('\nJobs written to {}\n'.format(output_filename))
+print()
+print('Jobs written to {}'.format(output_filename))
+print()
