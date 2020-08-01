@@ -11,3 +11,7 @@ message("libcudart: " ${LIBCUDART})
 
 set(CMAKE_CXX_FLAGS "-g")
 target_link_libraries(lazy ${LIBCUDART} bemps)
+
+if (DEBUG_LAZY)
+    add_definitions(-DDEBUG)
+endif()

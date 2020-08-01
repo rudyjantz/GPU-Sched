@@ -7,13 +7,16 @@
 static Runtime R;
 static int id = 0;
 
-static bool is_fake_addr(void *ptr) {
-  return (uint64_t)ptr >= 0xffff800000000000; 
+static bool is_fake_addr(void* ptr) {
+  return (uint64_t)ptr >= 0xffff800000000000;
 }
 
 extern "C" cudaError_t cudaMallocWrapper(void** devPtr, size_t size) {
   R.registerMallocOp(devPtr, size);
-  // fprintf(stderr, "delay a cudaMalloc (holder: %p, fake addr: %p)\n", devPtr, *devPtr);
+#if DEBUG
+  fprintf(stderr, "Delay a cudaMalloc (holder: %p, fake addr: %p)\n", devPtr,
+          *devPtr);
+#endif
   return cudaSuccess;
 }
 
@@ -21,14 +24,20 @@ extern "C" cudaError_t cudaMemcpyWrapper(void* dst, const void* src,
                                          size_t count,
                                          enum cudaMemcpyKind kind) {
   if (kind != cudaMemcpyHostToDevice || !is_fake_addr(dst)) {
-    // fprintf(stderr, "do actual cudaMemcpy for non-HostToDevice copy\n");
+#if DEBUG
+    fprintf(stderr, "do actual cudaMemcpy for non-HostToDevice copy\n");
+#endif
     return cudaMemcpy(dst, src, count, kind);
-  } else if(R.isAllocated(dst)) {
+  } else if (R.isAllocated(dst)) {
     dst = R.getValidAddrforFakeAddr(dst);
-    // fprintf(stderr, "perform cudaMemcpy for allocated HostToDevice (dst: %p, src: %p)\n", dst, src);
+#if DEBUG
+    fprintf(stderr, "perform cudaMemcpy for allocated HostToDevice (dst: %p, src: %p)\n", dst, src);
+#endif
     return cudaMemcpy(dst, src, count, kind);
   } else {
-    // fprintf(stderr, "Delay cudaMemcpy for HostToDevice (dst: %p, src: %p)\n", dst, src);
+#if DEBUG
+    fprintf(stderr, "Delay cudaMemcpy for HostToDevice (dst: %p, src: %p)\n", dst, src);
+#endif
     R.registerMemcpyOp(dst, (void*)src, count);
     return cudaSuccess;
   }
@@ -45,10 +54,11 @@ extern "C" cudaError_t cudaKernelLaunchPrepare(uint64_t gxy, int gz,
   int by = U32Y(bxy);
   int64_t membytes = R.getAggMemSize();
 
-  // printf(
-      // "A new kernel launch: \n\tgx: %d, gy: %d, gz: %d, bx: %d, by: %d, bz: "
-  //     "%d, mem: %ld, toIssue: %d\n",
-  //     gx, gy, gz, bx, by, bz, membytes, R.toIssue());
+#if DEBUG
+  printf("A new kernel launch: \n\tgx: %d, gy: %d, gz: %d, bx: %d, by: %d, bz: "
+      "%d, mem: %ld, toIssue: %d\n",
+      gx, gy, gz, bx, by, bz, membytes, R.toIssue());
+#endif
 
   if (R.toIssue()) {
     bemps_begin(id, gx, gy, gz, bx, by, bz, membytes);
