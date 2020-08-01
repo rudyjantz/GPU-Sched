@@ -22,6 +22,7 @@
 #define SCHED_MGB_BATCH_SIZE    10
 
 // Based on nvidia-smi
+const long P100_PCIE_TOTAL_MEM_KB = 16280L * 1024;
 const long TESLA_K80_TOTAL_MEM_KB = 11441L * 1024;
 const long GTX_1080_TOTAL_MEM_KB = 8116L * 1024;
 
@@ -42,6 +43,16 @@ const long GTX_1080_TOTAL_MEM_KB = 8116L * 1024;
   GPU_RES[1].cores = 2496;                           \
   memset(gpu_res_in_use, 0, sizeof(gpu_res_in_use)); \
   dump_gpu_res("cc_2");
+
+#elif defined(GPU_RES_CC_2P)
+#define NUM_GPUS 2
+#define INIT_GPU_RES()                               \
+  GPU_RES[0].mem_B = P100_PCIE_TOTAL_MEM_KB * 1024;  \
+  GPU_RES[0].cores = 3584;                           \
+  GPU_RES[1].mem_B = P100_PCIE_TOTAL_MEM_KB * 1024;  \
+  GPU_RES[1].cores = 3584;                           \
+  memset(gpu_res_in_use, 0, sizeof(gpu_res_in_use)); \
+  dump_gpu_res("cc_2p");
 
 #elif defined(GPU_RES_CC_4)
 #define NUM_GPUS 4
@@ -310,8 +321,14 @@ void sched_mgb(void) {
           stats.num_frees++;
           tmp_dev_id = comm->sched_notif.device_id;
           // Add (don't subtract), because mem_B is negative already
-          gpu_res_in_use[tmp_dev_id].mem_B += comm->beacon.mem_B;
-          gpu_res_in_use[tmp_dev_id].cores += comm->beacon.cores;
+          long tmp_bytes_to_free = comm->beacon.mem_B;
+          long tmp_cores_to_free = comm->beacon.cores;
+          BEMPS_SCHED_LOG("Freeing " << tmp_bytes_to_free << " bytes "
+                          << "from device " << tmp_dev_id << "\n");
+          BEMPS_SCHED_LOG("Freeing " << tmp_cores_to_free << " cores "
+                          << "from device " << tmp_dev_id << "\n");
+          gpu_res_in_use[tmp_dev_id].mem_B += tmp_bytes_to_free;
+          gpu_res_in_use[tmp_dev_id].cores += tmp_cores_to_free;
         } else {
           stats.num_beacons++;
           boomers.push_back(comm);
@@ -349,6 +366,10 @@ void sched_mgb(void) {
       long curr_min_cores = LONG_MAX;
       int target_dev_id = 0;
       for (tmp_dev_id = 0; tmp_dev_id < NUM_GPUS; tmp_dev_id++) {
+        BEMPS_SCHED_LOG("Checking device " << tmp_dev_id << "\n"
+                        << "  Total avail bytes: " << GPU_RES[tmp_dev_id].mem_B << "\n"
+                        << "  In-use bytes: " << gpu_res_in_use[tmp_dev_id].mem_B << "\n"
+                        << "  Trying-to-fit bytes: " << comm->beacon.mem_B << "\n");
         if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
              GPU_RES[tmp_dev_id].mem_B)) {
           if (gpu_res_in_use[tmp_dev_id].cores < curr_min_cores) {
@@ -356,6 +377,8 @@ void sched_mgb(void) {
               target_dev_id = tmp_dev_id;
               assigned = 1;
           }
+        } else {
+            BEMPS_SCHED_LOG("Couldn't fit " << comm->beacon.mem_B << "\n");
         }
       }
 
@@ -365,8 +388,14 @@ void sched_mgb(void) {
         comm->age++;
         boomers.push_back(comm);
       } else {
-        gpu_res_in_use[target_dev_id].mem_B += comm->beacon.mem_B;
-        gpu_res_in_use[target_dev_id].cores += comm->beacon.cores;
+        long tmp_bytes_to_add = comm->beacon.mem_B;
+        long tmp_cores_to_add = comm->beacon.cores;
+        BEMPS_SCHED_LOG("Adding " << tmp_bytes_to_add << " bytes "
+                        << "to device " << target_dev_id << "\n");
+        BEMPS_SCHED_LOG("Adding " << tmp_cores_to_add << " cores "
+                        << "to device " << target_dev_id << "\n");
+        gpu_res_in_use[target_dev_id].mem_B += tmp_bytes_to_add;
+        gpu_res_in_use[target_dev_id].cores += tmp_cores_to_add;
         BEMPS_SCHED_LOG("sem_post for pid(" << comm->pid << ") "
                                             << "on device(" << target_dev_id
                                             << ")\n");
