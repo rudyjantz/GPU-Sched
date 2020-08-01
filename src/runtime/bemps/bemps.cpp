@@ -299,8 +299,8 @@ void bemps_free(int bemps_tid) {
   int orig_beacon_q_idx;
   int free_beacon_q_idx;
   bemps_shm_comm_t *comm;
-  unsigned int mem_B;
-  unsigned int cores;
+  long mem_B;
+  long cores;
   int device_id;
 
   //
