@@ -13,11 +13,12 @@
 __global__ void VecAdd(double *A, double *B, double *C) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   C[i] = A[i] + B[i];
+  printf("A[%d] (%f) + B[%d] (%f) = C[%d] (%f)\n", i, A[i], i, B[i], i, C[i]);
 }
 
 int main(int argc, char **argv) {
   // A and B are input data, C is to store output data
-  double *A, *B, *C, sum = 0;
+  double A[N], B[N], C[N], sum = 0;
   dim3 ThreadsPerBlock(BLK);
   dim3 BlocksPerGrid(N/BLK);
   size_t size = N * sizeof(double);
@@ -47,7 +48,10 @@ int main(int argc, char **argv) {
 
   cudaMemcpy(C, d_res, size, cudaMemcpyDeviceToHost);
 
-  for (int i = 0; i < size; i++) sum+= C[i];
+  for (int i = 0; i < N; i++) {
+    if (i % 64 == 0) printf("C[%d] = %f\n", i, C[i]);
+    sum+= C[i];
+  }
   printf("sum = %f\n", sum);
 
 
