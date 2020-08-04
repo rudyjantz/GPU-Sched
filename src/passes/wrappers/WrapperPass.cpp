@@ -35,6 +35,22 @@ void WrapperPass::replaceMemcpy(CallInst *CI) {
   CI->replaceAllUsesWith(ret);
 }
 
+void WrapperPass::replaceMemcpyToSymbol(CallInst *CI) {
+  dbgs() << "repalcing MemcpyToSymbol : " << *CI << "\n\t" << *CI->getArgOperand(0)
+         << "\n\t" << *CI->getArgOperand(1) << "\n\t" << *CI->getArgOperand(2)
+         << "\n\t" << *CI->getArgOperand(3) << "\n\n";
+  IRBuilder<NoFolder> IRB(CI->getContext());
+  IRB.SetInsertPoint(CI);
+  SmallVector<Value *, 4> args;
+  args.push_back(CI->getArgOperand(0));
+  args.push_back(CI->getArgOperand(1));
+  args.push_back(CI->getArgOperand(2));
+  args.push_back(CI->getArgOperand(3));
+  args.push_back(CI->getArgOperand(4));
+  auto ret = IRB.CreateCall(MemcpyToSymbolWrapper, args);
+  CI->replaceAllUsesWith(ret);
+}
+
 void WrapperPass::replaceFree(CallInst *CI) {
   dbgs() << "repalcing Free : " << *CI << "\n\t" << *CI->getArgOperand(0)
          << "\n\n";
@@ -81,6 +97,11 @@ bool WrapperPass::doInitialization(Module &M) {
       FunctionType::get(retTy, {dstTy, srcTy, sizeTy, kindTy}, false);
   MemcpyWrapper = M.getOrInsertFunction("cudaMemcpyWrapper", MemcpyWrapperFTy);
 
+  FunctionType *MemcpyToSymbolWrapperFTy =
+      FunctionType::get(retTy, {dstTy, srcTy, sizeTy, sizeTy, kindTy}, false);
+  MemcpyToSymbolWrapper = M.getOrInsertFunction("cudaMemcpyToSymbolWrapper",
+                                                MemcpyToSymbolWrapperFTy);
+
   // declare cudaKernelLaunchPrepare()
   // resuse sizeTy and retTy for int64_t and int32_t
   FunctionType *KernelLaunchPrepareFTy =
@@ -118,6 +139,9 @@ bool WrapperPass::runOnModule(Module &M) {
         ToBeRemoved.push_back(CI);
       } else if (name == "cudaMemcpy") {
         replaceMemcpy(CI);
+        ToBeRemoved.push_back(CI);
+      } else if (name == "cudaMemcpyToSymbol") {
+        replaceMemcpyToSymbol(CI);
         ToBeRemoved.push_back(CI);
       } else if (name == "cudaFree") {
         replaceFree(CI);

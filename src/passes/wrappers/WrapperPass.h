@@ -19,11 +19,13 @@ class WrapperPass : public ModulePass {
  private:
   FunctionCallee MallocWrapper;
   FunctionCallee MemcpyWrapper;
+  FunctionCallee MemcpyToSymbolWrapper;
   FunctionCallee KernelLaunchPrepare;
   FunctionCallee FreeWrapper;
 
   void replaceMalloc(CallInst *CI);
   void replaceMemcpy(CallInst *CI);
+  void replaceMemcpyToSymbol(CallInst *CI);
   void replaceFree(CallInst *CI);
   void addKernelLaunchPrepare(CallInst *CI);
 
