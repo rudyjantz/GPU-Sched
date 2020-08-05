@@ -41,7 +41,7 @@ def run_benchmark(cmd):
     else:
         print_flush('suc')
     print_flush(o.decode('utf-8'))
-    #print_flush(e.decode('utf-8'))
+    print_flush(e.decode('utf-8'))
 
 
 
