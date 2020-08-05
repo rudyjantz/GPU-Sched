@@ -27,7 +27,7 @@ with open(filename) as f:
     for line in f:
         if 'TOTAL_BENCHMARK_TIME' in line:
             line = line.strip().split()
-            bmark_times.append((line[3], line[4]))
+            bmark_times.append((int(line[3]), line[4]))
         elif 'TOTAL_EXPERIMENT_TIME' in line:
             line = line.strip().split()
             total_time = line[3]
