@@ -123,7 +123,6 @@ std::vector<int> avail_device_ids;
 //
 // C:G scheduler
 //
-
 // Number of CPU cores producing work for 1 GPU
 // FIXME This nasty, though, because the workload driver has to match this
 // exactly (or you'll get an error in the scheduler due to no available device)
@@ -411,22 +410,22 @@ void sched_mgb(void) {
 
 
 void sched_cg(void) {
-  // FIXME init somewhere else?
-  device_id_count_t *dc;
-  int i;
-  for(i = 0; i < NUM_GPUS; i++){
-    dc = (device_id_count_t *) malloc(sizeof(device_id_count_t));
-    dc->device_id = i;
-    dc->count = JOBS_PER_GPU;
-    avail_device_id_counts.push_back(dc);
-  }
 
+  int i;
   int rc;
   int device_id;
   int *head_p;
   int *tail_p;
   struct timespec ts;
   bemps_shm_comm_t *comm;
+  device_id_count_t *dc;
+
+  for(i = 0; i < NUM_GPUS; i++){
+    dc = (device_id_count_t *) malloc(sizeof(device_id_count_t));
+    dc->device_id = i;
+    dc->count = JOBS_PER_GPU;
+    avail_device_id_counts.push_back(dc);
+  }
 
   device_id = 0;
   head_p = &bemps_shm_p->gen->beacon_q_head;
@@ -503,6 +502,7 @@ void sched_cg(void) {
 
 
 void sched_single_assignment(void) {
+  int i;
   int rc;
   int device_id;
   int *head_p;
@@ -510,9 +510,9 @@ void sched_single_assignment(void) {
   struct timespec ts;
   bemps_shm_comm_t *comm;
 
-  // FIXME initialize this in the proper place and in a maintainable way
-  avail_device_ids.push_back(0);
-  avail_device_ids.push_back(1);
+  for(i = 0; i < NUM_GPUS; i++){
+    avail_device_ids.push_back(i);
+  }
 
   device_id = 0;
   head_p = &bemps_shm_p->gen->beacon_q_head;
