@@ -14,30 +14,33 @@
 #       Move scheduler results to results folder
 #
 
-
-BEMPS_SCHED_PATH=/home/cc/GPU-Sched/build/runtime/sched
-WORKLOADER_PATH=/home/cc/GPU-Sched/src/runtime/driver
-WORKLOADS_PATH=/home/cc/GPU-Sched/src/runtime/driver/workloads/test
+BASE_PATH=/home/rudy/wo/gpu
+#BASE_PATH=/home/cc
+BEMPS_SCHED_PATH=${BASE_PATH}/GPU-Sched/build/runtime/sched
+WORKLOADER_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver
+WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/test
 RESULTS_PATH=results
 
 
 
 WORKLOADS=(
     #debug_02.wl
+    debug_05.wl
     #k80_small_16jobs_0.wl
-    k80_small_16jobs_1.wl
+    #k80_small_16jobs_1.wl
     #k80_medium_16jobs_0.wl
-    k80_medium_16jobs_1.wl
+    #k80_medium_16jobs_1.wl
     #k80_large_16jobs_0.wl
-    k80_large_16jobs_1.wl
+    #k80_large_16jobs_1.wl
     ##random_00.wl
     ##random_01.wl
 )
 
 declare -A SCHED_ALG_TO_NUM_PROCS=(
-    [single-assignment]=2
-    [cg]=6
-    [mgb]=12
+    [single-assignment]=1
+    #[single-assignment]=2
+    #[cg]=6 # XXX Do not change this without changing JOBS_PER_GPU in sched.cpp
+    #[mgb]=12
 )
 
 mkdir -p results
