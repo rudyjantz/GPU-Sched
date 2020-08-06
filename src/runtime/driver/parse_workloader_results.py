@@ -91,21 +91,28 @@ def report_avg_speedup_throughput_improvement_and_job_slowdown():
 
     cg_job_slowdowns  = [ t[0][1] / t[1][1] for t in zip(cg_job_times, sa_job_times) ]
     mgb_job_slowdowns = [ t[0][1] / t[1][1] for t in zip(mgb_job_times, sa_job_times) ]
-    print('mean_cg_job_slowdown {}'.format(statistics.mean(cg_job_slowdowns)))
-    print('geomean_cg_job_slowdown {}'.format(gmean(cg_job_slowdowns)))
-    print('mean_mgb_job_slowdown {}'.format(statistics.mean(mgb_job_slowdowns)))
-    print('geomean_mgb_job_slowdown {}'.format(gmean(mgb_job_slowdowns)))
+    avg_cg_job_slowdown      = statistics.mean(cg_job_slowdowns)
+    avg_mgb_job_slowdown     = statistics.mean(mgb_job_slowdowns)
+    geomean_cg_job_slowdown  = gmean(cg_job_slowdowns)
+    geomean_mgb_job_slowdown = gmean(mgb_job_slowdowns)
+    print('mean_cg_job_slowdown {}'.format(avg_cg_job_slowdown))
+    print('geomean_cg_job_slowdown {}'.format(geomean_cg_job_slowdown))
+    print('mean_mgb_job_slowdown {}'.format(avg_mgb_job_slowdown))
+    print('geomean_mgb_job_slowdown {}'.format(geomean_mgb_job_slowdown))
     print()
 
     print('normalized_throughput_improvements sa cg mgb')
     for idx, workload in enumerate(workloads):
         print('{} {} {} {}'.format(workload, 1, cg_throughput_improvements[idx],
                                   mgb_throughput_improvements[idx]))
+    print('{} {} {} {}'.format('average', 1, avg_cg_throughput_improvement,
+                                  avg_mgb_throughput_improvement))
     print()
 
     print('normalized_job_slowdowns sa cg mgb')
     for idx, workload in enumerate(workloads):
         print('{} {} {} {}'.format(workload, 1, cg_job_slowdowns[idx], mgb_job_slowdowns[idx]))
+    print('{} {} {} {}'.format('average', 1, avg_cg_job_slowdown, avg_mgb_job_slowdown))
     print()
 
 
