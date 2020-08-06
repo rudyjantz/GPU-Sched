@@ -76,13 +76,18 @@ def report_total_time_and_throughput(workload):
 def report_avg_speedup_throughput_improvement_and_job_slowdown():
     cg_speedups  = [ t[0] / t[1] for t in zip(sa_total_times, cg_total_times) ]
     mgb_speedups = [ t[0] / t[1] for t in zip(sa_total_times, mgb_total_times) ]
-    print('avg_cg_speedup {}'.format(statistics.mean(cg_speedups)))
-    print('avg_mgb_speedup {}'.format(statistics.mean(mgb_speedups)))
+    avg_cg_speedup  = statistics.mean(cg_speedups)
+    avg_mgb_speedup = statistics.mean(mgb_speedups)
 
     cg_throughput_improvements  = [ t[1] / t[0] for t in zip(sa_throughputs, cg_throughputs) ]
     mgb_throughput_improvements = [ t[1] / t[0] for t in zip(sa_throughputs, mgb_throughputs) ]
-    print('avg_cg_throughput_improvement {}'.format(statistics.mean(cg_throughput_improvements)))
-    print('avg_mgb_throughput_improvement {}'.format(statistics.mean(mgb_throughput_improvements)))
+    avg_cg_throughput_improvement  = statistics.mean(cg_throughput_improvements)
+    avg_mgb_throughput_improvement = statistics.mean(mgb_throughput_improvements)
+
+    assert avg_cg_throughput_improvement  == avg_cg_speedup  # could fail due
+    assert avg_mgb_throughput_improvement == avg_mgb_speedup # to rounding error
+    print('avg_cg_throughput_improvement {}'.format(avg_cg_throughput_improvement))
+    print('avg_mgb_throughput_improvement {}'.format(avg_mgb_throughput_improvement))
 
     cg_job_slowdowns  = [ t[0][1] / t[1][1] for t in zip(cg_job_times, sa_job_times) ]
     mgb_job_slowdowns = [ t[0][1] / t[1][1] for t in zip(mgb_job_times, sa_job_times) ]
@@ -90,7 +95,18 @@ def report_avg_speedup_throughput_improvement_and_job_slowdown():
     print('geomean_cg_job_slowdown {}'.format(gmean(cg_job_slowdowns)))
     print('mean_mgb_job_slowdown {}'.format(statistics.mean(mgb_job_slowdowns)))
     print('geomean_mgb_job_slowdown {}'.format(gmean(mgb_job_slowdowns)))
+    print()
 
+    print('normalized_throughput_improvements sa cg mgb')
+    for idx, workload in enumerate(workloads):
+        print('{} {} {} {}'.format(workload, 1, cg_throughput_improvements[idx],
+                                  mgb_throughput_improvements[idx]))
+    print()
+
+    print('normalized_job_slowdowns sa cg mgb')
+    for idx, workload in enumerate(workloads):
+        print('{} {} {} {}'.format(workload, 1, cg_job_slowdowns[idx], mgb_job_slowdowns[idx]))
+    print()
 
 
 
@@ -122,6 +138,6 @@ for workload in workloads:
     cg_throughputs.append(cg_throughput)
     mgb_throughputs.append(mgb_throughput)
 
-    report_total_time_and_throughput(workload)
+    #report_total_time_and_throughput(workload)
 
 report_avg_speedup_throughput_improvement_and_job_slowdown()
