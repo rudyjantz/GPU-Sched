@@ -33,6 +33,15 @@
 
 #define ABS(x) (((x) ^ ((x) >> 31)) - ((x) >> 31))
 
+#define BEMPS_NUM_STOPWATCHES 2
+
+typedef enum {
+  BEMPS_STOPWATCH_BEACON = 0,
+  BEMPS_STOPWATCH_FREE
+} bemps_stopwatch_e;
+
+
+
 pid_t pid;  // linux process id
 bool beacon_initialized = false;
 
@@ -40,6 +49,9 @@ std::map<int, int> bemps_tid_to_q_idx;
 
 // base of the bemps shared memory
 bemps_shm_t bemps_shm;
+
+
+bemps_stopwatch_t bemps_stopwatches[BEMPS_NUM_STOPWATCHES];
 
 // Programmer-friendly pointers into the application's shared memory elements
 // long long           *timestamp_p;
@@ -53,6 +65,47 @@ static inline long long _get_time_ns(void) {
   }
   return (((long long)tv.tv_sec * 1000000000L) + (long long)(tv.tv_nsec));
 }
+
+void _bemps_dump_stats(void) {
+#ifdef BEMPS_TIMING
+  bemps_stopwatch_t *sb;
+  bemps_stopwatch_t *sf;
+  sb = &bemps_stopwatches[BEMPS_STOPWATCH_BEACON];
+  sf = &bemps_stopwatches[BEMPS_STOPWATCH_FREE];
+  BEMPS_LOG("Dumping bemps stats\n");
+  BEMPS_LOG("count of beacon times: " << sb->n << "\n");
+  BEMPS_LOG("min beacon time (ns): " << sb->min << "\n");
+  BEMPS_LOG("max beacon time (ns): " << sb->max << "\n");
+  BEMPS_LOG("avg beacon time (ns): " << sb->avg << "\n");
+  BEMPS_LOG("count of free times: " << sf->n << "\n");
+  BEMPS_LOG("min free time (ns): " << sf->min << "\n");
+  BEMPS_LOG("max free time (ns): " << sf->max << "\n");
+  BEMPS_LOG("avg free time (ns): " << sf->avg << "\n");
+#endif
+}
+void bemps_stopwatch_start(bemps_stopwatch_t *s) {
+#ifdef BEMPS_TIMING
+  s->ts = _get_time_ns();
+#endif
+}
+void bemps_stopwatch_end(bemps_stopwatch_t *s) {
+#ifdef BEMPS_TIMING
+  long long diff;
+  ++(s->n);
+  diff = _get_time_ns() - s->ts;
+  if (diff < s->min || s->min == 0LL) {
+    s->min = diff;
+  } // not else-if. edge case: 1 beacon. min and max both get updated
+  if (diff > s->max) {
+    s->max = diff;
+  }
+  // FIXME ? types. looks like diff - s->avg should become a double. then divide by s->n is double
+  s->avg += (diff - s->avg) / s->n;
+#endif
+}
+
+
+
 
 static inline int _inc_head(int *head) {
   int q_idx;
@@ -267,6 +320,8 @@ void bemps_beacon(int bemps_tid, bemps_beacon_t *beacon) {
 extern "C" {
 void bemps_begin(int id, int gx, int gy, int gz, int bx, int by, int bz,
                  int64_t membytes) {
+
+  bemps_stopwatch_start(&bemps_stopwatches[BEMPS_STOPWATCH_BEACON]);
   if (!beacon_initialized) {
     beacon_initialized = !bemps_init();
   }
@@ -276,6 +331,7 @@ void bemps_begin(int id, int gx, int gy, int gz, int bx, int by, int bz,
   beacon.cores = warps;
   beacon.mem_B = membytes;
   bemps_beacon(id, &beacon);
+  bemps_stopwatch_end(&bemps_stopwatches[BEMPS_STOPWATCH_BEACON]);
 }
 }
 
@@ -302,6 +358,8 @@ void bemps_free(int bemps_tid) {
   long mem_B;
   long cores;
   int device_id;
+
+  bemps_stopwatch_start(&bemps_stopwatches[BEMPS_STOPWATCH_FREE]);
 
   //
   // Look up what was used by this BEMPS task.
@@ -344,6 +402,8 @@ void bemps_free(int bemps_tid) {
   // Don't need to wait for the scheduler
   // Don't need to capture the q_idx in bemps_tid_to_q_idx
   // Don't need to set device
+
+  bemps_stopwatch_end(&bemps_stopwatches[BEMPS_STOPWATCH_FREE]);
 }
 }
 
@@ -366,6 +426,8 @@ void _send_beacon_at_exit(void)
   // XXX This should be the last field that we change in the comm structure,
   // because it's used for gating the scheduler and preventing races.
   comm->state = BEMPS_BEACON_STATE_BEACON_FIRED_E;
+
+  _bemps_dump_stats();
 
 }
 

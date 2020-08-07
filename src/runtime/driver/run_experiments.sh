@@ -26,6 +26,7 @@ RESULTS_PATH=results
 WORKLOADS=(
     #debug_02.wl
     debug_05.wl
+    #debug_06.wl
     #k80_small_16jobs_0.wl
     #k80_small_16jobs_1.wl
     #k80_medium_16jobs_0.wl
@@ -37,10 +38,10 @@ WORKLOADS=(
 )
 
 declare -A SCHED_ALG_TO_NUM_PROCS=(
-    [single-assignment]=1
+    #[single-assignment]=1
     #[single-assignment]=2
-    #[cg]=6 # XXX Do not change this without changing JOBS_PER_GPU in sched.cpp
-    #[mgb]=12
+    #[cg]=6 # XXX Do not change this without changing SCHED_JOBS_PER_GPU in sched.cpp
+    [mgb]=12
 )
 
 mkdir -p results

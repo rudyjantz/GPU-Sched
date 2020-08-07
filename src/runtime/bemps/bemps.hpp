@@ -3,6 +3,8 @@
 
 #include <semaphore.h>
 
+#define BEMPS_TIMING
+
 #define BEMPS_BEACON_BUF_SZ 0x1000
 
 #define BEMPS_SCHED_TIMEOUT_NS 100000000UL  // 100ms
@@ -66,6 +68,14 @@ typedef struct {
   bemps_shm_comm_t *comm;
 } bemps_shm_t;
 
+typedef struct {
+    unsigned long long n; // number of timings taken
+    long long ts; // holds most recent starting timestamp from get-time-ns()
+    long long min;
+    long long max;
+    double avg;
+} bemps_stopwatch_t;
+
 /*
  * Notify BEMPS of an upcoming GPU task.
  */
@@ -102,5 +112,15 @@ bemps_shm_t *bemps_sched_init(int max_batch_size);
  * Initialization function for processes that are using BEMPS.
  */
 int bemps_init(void);
+
+/*
+ * Capture a start time for the provided stopwatch
+ */
+void bemps_stopwatch_start(bemps_stopwatch_t *s);
+
+/*
+ * Capture an end time and update appropriate stopwatch values
+ */
+void bemps_stopwatch_end(bemps_stopwatch_t *s);
 
 #endif

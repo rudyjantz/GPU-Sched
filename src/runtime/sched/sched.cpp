@@ -90,6 +90,12 @@ const long GTX_1080_TOTAL_MEM_KB = 8116L * 1024;
   } while (0)
 #endif
 
+#define SCHED_NUM_STOPWATCHES 1
+typedef enum {
+  SCHED_STOPWATCH_AWAKE = 0 // time the scheduler spends awake and processing
+} sched_stopwatch_e;
+
+
 typedef enum {
   SCHED_ALG_ZERO_E = 0,
   SCHED_ALG_ROUND_ROBIN_E,
@@ -113,6 +119,10 @@ typedef struct {
   int max_observed_batch_size;
 } sched_stats_t;
 
+
+bemps_stopwatch_t sched_stopwatches[SCHED_NUM_STOPWATCHES];
+
+
 //
 // single-assignment scheduler
 //
@@ -126,8 +136,8 @@ std::vector<int> avail_device_ids;
 // Number of CPU cores producing work for 1 GPU
 // FIXME This nasty, though, because the workload driver has to match this
 // exactly (or you'll get an error in the scheduler due to no available device)
-#define CORE_TO_GPU_RATIO 6
-#define JOBS_PER_GPU      CORE_TO_GPU_RATIO // ...renaming as num jobs per GPU
+#define SCHED_CORE_TO_GPU_RATIO 6
+#define SCHED_JOBS_PER_GPU      SCHED_CORE_TO_GPU_RATIO // ...renaming as num jobs per GPU
 
 typedef struct {
     int device_id;
@@ -219,15 +229,25 @@ void dump_stats(void) {
     BEMPS_SCHED_LOG(str); \
   } while (0)
   std::ofstream stats_file;
-  stats_file.open ("sched-stats.out");
+  bemps_stopwatch_t *sa;
+
+  stats_file.open("sched-stats.out");
+  sa = &sched_stopwatches[SCHED_STOPWATCH_AWAKE];
+
   BEMPS_SCHED_LOG("Caught interrupt. Exiting.\n");
   STATS_LOG("num_beacons: " << stats.num_beacons << "\n");
   STATS_LOG("num_frees: " << stats.num_frees << "\n");
   STATS_LOG("max_len_boomers: " << stats.max_len_boomers << "\n");
   STATS_LOG("max_age: " << stats.max_age << "\n");
   STATS_LOG("max_batch_size: " << max_batch_size << "\n");
-  STATS_LOG("max_observed_batch_size: " << stats.max_observed_batch_size
-                                              << "\n");
+  STATS_LOG("max_observed_batch_size: "<<stats.max_observed_batch_size<< "\n");
+#ifdef BEMPS_TIMING
+  STATS_LOG("count of awake times: " << sa->n << "\n");
+  STATS_LOG("min awake time (ns): " << sa->min << "\n");
+  STATS_LOG("max awake time (ns): " << sa->max << "\n");
+  STATS_LOG("avg awake time (ns): " << sa->avg << "\n");
+#endif
+
   stats_file.close();
 }
 
@@ -262,6 +282,7 @@ struct AvailDevicesCompare {
 } avail_devices_compare;
 
 
+
 // Our custom scheduler, multi-GPU with beacons
 void sched_mgb(void) {
   int tmp_dev_id;
@@ -287,6 +308,7 @@ void sched_mgb(void) {
     pthread_cond_timedwait(&bemps_shm_p->gen->cond, &bemps_shm_p->gen->lock,
                            &ts);
     pthread_mutex_unlock(&bemps_shm_p->gen->lock);
+    bemps_stopwatch_start(&sched_stopwatches[SCHED_STOPWATCH_AWAKE]);
 
     // First loop: Catch the scheduler's tail back up with the beacon
     // queue's head. If we see a free-beacon, then reclaim that resource.
@@ -405,6 +427,7 @@ void sched_mgb(void) {
         sem_post(&comm->sched_notif.sem);
       }
     }
+    bemps_stopwatch_end(&sched_stopwatches[SCHED_STOPWATCH_AWAKE]);
   }
 }
 
@@ -423,7 +446,7 @@ void sched_cg(void) {
   for(i = 0; i < NUM_GPUS; i++){
     dc = (device_id_count_t *) malloc(sizeof(device_id_count_t));
     dc->device_id = i;
-    dc->count = JOBS_PER_GPU;
+    dc->count = SCHED_JOBS_PER_GPU;
     avail_device_id_counts.push_back(dc);
   }
 
@@ -445,6 +468,7 @@ void sched_cg(void) {
     pthread_mutex_unlock(&bemps_shm_p->gen->lock);
 
     BEMPS_SCHED_LOG("Woke up\n");
+    bemps_stopwatch_start(&sched_stopwatches[SCHED_STOPWATCH_AWAKE]);
 
     // catch the scheduler's tail back up with the beacon queue's head
     while (*tail_p != *head_p) {
@@ -467,7 +491,7 @@ void sched_cg(void) {
         BEMPS_SCHED_LOG("pid(" << comm->pid << ") exiting.\n");
         BEMPS_SCHED_LOG("recycling device_id(" << dc->device_id << ").\n");
         dc->count++;
-        assert(dc->count <= JOBS_PER_GPU); // error could mean problem with driver
+        assert(dc->count <= SCHED_JOBS_PER_GPU); // error could mean problem with driver
         avail_device_id_counts.sort(avail_devices_compare);
         pid_to_device_id_counts.erase(comm->pid);
         comm->exit_flag = 0;
@@ -486,7 +510,7 @@ void sched_cg(void) {
           // Found: Do nothing.
           // assert that at least one process (the one that sent this beacon)
           // is assigned to this device (i.e. count should be < max)
-          assert(pid_to_device_id_counts[comm->pid]->count < JOBS_PER_GPU);
+          assert(pid_to_device_id_counts[comm->pid]->count < SCHED_JOBS_PER_GPU);
         }
 
         comm->state = BEMPS_BEACON_STATE_SCHEDULER_READ_E;
@@ -497,6 +521,7 @@ void sched_cg(void) {
 
       *tail_p = (*tail_p + 1) & (BEMPS_BEACON_BUF_SZ - 1);
     }
+    bemps_stopwatch_end(&sched_stopwatches[SCHED_STOPWATCH_AWAKE]);
   }
 }
 
