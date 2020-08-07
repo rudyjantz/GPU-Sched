@@ -14,3 +14,5 @@ Benchmarks/rodinia_cuda_3.1/cuda/hotspot3D/3D
 Benchmarks/rodinia_cuda_3.1/cuda/particlefilter/particlefilter_float
 Benchmarks/rodinia_cuda_3.1/cuda/particlefilter/particlefilter_naive
 Benchmarks/rodinia_cuda_3.1/cuda/srad/srad_v2/srad
+Tools/plotting/graphs
+Tools/plotting/*.in
