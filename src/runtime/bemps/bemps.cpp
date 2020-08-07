@@ -99,7 +99,6 @@ void bemps_stopwatch_end(bemps_stopwatch_t *s) {
   if (diff > s->max) {
     s->max = diff;
   }
-  // FIXME ? types. looks like diff - s->avg should become a double. then divide by s->n is double
   s->avg += (diff - s->avg) / s->n;
 #endif
 }
