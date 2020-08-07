@@ -2,11 +2,14 @@
 import sys
 import statistics
 from scipy.stats.mstats import gmean
+from pprint import pprint
 
 
 
 
-BASE_PATH = '/home/rudy/wo/gpu/bes-gpu/foo/scripts/cc/results-2020.08.01-7.30pm'
+#BASE_PATH = '/home/rudy/wo/gpu/bes-gpu/foo/scripts/cc/results-2020.08.01-7.30pm'
+BASE_PATH = '/home/rudy/wo/gpu/GPU-Sched/src/runtime/driver/results'
+
 SCHED_LOG_SUF  = 'sched-log'
 SCHED_STAT_SUF = 'sched-stats'
 WRKLDR_LOG_SUF = 'workloader-log'
@@ -17,12 +20,14 @@ DEBUG = False
 
 # TODO: move to input files and support command-line args
 workloads = [
-    'k80_small_16jobs_0',
-    'k80_small_16jobs_1',
-    'k80_medium_16jobs_0',
-    'k80_medium_16jobs_1',
-    'k80_large_16jobs_0',
-    'k80_large_16jobs_1',
+    #'k80_small_16jobs_0',
+    #'k80_small_16jobs_1',
+    #'k80_medium_16jobs_0',
+    #'k80_medium_16jobs_1',
+    #'k80_large_16jobs_0',
+    #'k80_large_16jobs_1',
+    #'k80_large_16jobs_1',
+    'debug_05'
 ]
 
 
@@ -41,18 +46,90 @@ def parse_workloader_log(filename):
     #   Worker 1: TOTAL_BENCHMARK_TIME 2 1.2312407493591309
     # total time:
     #   Worker 0: TOTAL_EXPERIMENT_TIME 4.400961637496948
+    # beacon timing (if it's turned on):
+    #   12949252580699578 _bemps_dump_stats: count of beacon times: 1
+    #   12949252580707683 _bemps_dump_stats: min beacon time (ns): 103063473
+    #   12949252580708435 _bemps_dump_stats: max beacon time (ns): 103063473
+    #   12949252580709246 _bemps_dump_stats: avg beacon time (ns): 1.03063e+08
+    #   12949252580740675 _bemps_dump_stats: count of free times: 1
+    #   12949252580741427 _bemps_dump_stats: min free time (ns): 68178
+    #   12949252580742148 _bemps_dump_stats: max free time (ns): 68178
+    #   12949252580742839 _bemps_dump_stats: avg free time (ns): 68178
+    COUNT_BEACON_STR = 'count of beacon times:'
+    MIN_BEACON_STR = 'min beacon time (ns):'
+    MAX_BEACON_STR = 'max beacon time (ns):'
+    AVG_BEACON_STR = 'avg beacon time (ns):'
+    COUNT_FREE_STR = 'count of free times:'
+    MIN_FREE_STR = 'min free time (ns):'
+    MAX_FREE_STR = 'max free time (ns):'
+    AVG_FREE_STR = 'avg free time (ns):'
+
+    # beacon times
+    bt = {
+        'min_beacon': 1<<65,
+        'max_beacon': 0,
+        'avg_beacon': 0,
+        'min_free': 1<<65,
+        'max_free': 0,
+        'avg_free': 0,
+    }
+    num_beacons = 0
+    num_frees = 0
+    beacon_avgs = []
+    free_avgs = []
+
     bmark_times = []
     total_time  = 0
     throughput = 0
     print_debug(filename)
     with open(filename) as f:
+        count_beacon_flag = 0 # to help with asserts
+        count_free_flag   = 0
         for line in f:
             if 'TOTAL_BENCHMARK_TIME' in line:
                 line = line.strip().split()
                 bmark_times.append( (int(line[3]), float(line[4])) )
             elif 'TOTAL_EXPERIMENT_TIME' in line:
-                line = line.strip().split()
-                total_time = float(line[3])
+                total_time = float(line.strip().split()[3])
+            elif COUNT_BEACON_STR in line:
+                count_beacon = int(line.strip().split()[6])
+                num_beacons += count_beacon
+                count_beacon_flag += 1
+            elif MIN_BEACON_STR in line:
+                min_beacon = int(line.strip().split()[6])
+                if min_beacon < bt['min_beacon']:
+                    bt['min_beacon'] = min_beacon
+            elif MAX_BEACON_STR in line:
+                max_beacon = int(line.strip().split()[6])
+                if max_beacon > bt['max_beacon']:
+                    bt['max_beacon'] = max_beacon
+            elif AVG_BEACON_STR in line:
+                avg_beacon = float(line.strip().split()[6])
+                count_beacon_flag -= 1
+                assert count_beacon_flag == 0
+                beacon_avgs.append((count_beacon, avg_beacon))
+            elif COUNT_FREE_STR in line:
+                count_free = int(line.strip().split()[6])
+                num_frees += count_free
+                count_free_flag += 1
+            elif MIN_FREE_STR in line:
+                min_free = int(line.strip().split()[6])
+                if min_free < bt['min_free']:
+                    bt['min_free'] = min_free
+            elif MAX_FREE_STR in line:
+                max_free = int(line.strip().split()[6])
+                if max_free > bt['max_free']:
+                    bt['max_free'] = max_free
+            elif AVG_FREE_STR in line:
+                avg_free = float(line.strip().split()[6])
+                count_free_flag -= 1
+                assert count_free_flag == 0
+                free_avgs.append((count_free, avg_free))
+
+    for count, avg in beacon_avgs:
+        bt['avg_beacon'] += avg * count / num_beacons
+    for count, avg in free_avgs:
+        bt['avg_free'] += avg * count / num_frees
 
     throughput = len(bmark_times) / float(total_time)
 
@@ -61,7 +138,7 @@ def parse_workloader_log(filename):
         print_debug('{} {}'.format(t[0], t[1]))
     print_debug('total {}'.format(total_time))
     print_debug('throughput {}'.format(throughput))
-    return sorted_bmark_times, total_time, throughput
+    return sorted_bmark_times, total_time, throughput, bt
 
 
 def report_total_time_and_throughput(workload):
@@ -70,6 +147,21 @@ def report_total_time_and_throughput(workload):
     print('sa {} {}'.format(sa_total_time, sa_throughput))
     print('cg {} {}'.format(cg_total_time, cg_throughput))
     print('mgb {} {}'.format(mgb_total_time, mgb_throughput))
+    print()
+
+
+def report_beacon_times(sa_bcn_times, cg_bcn_times, mgb_bcn_times):
+    print('sa beacon times')
+    for k, v in sa_bcn_times.items():
+        print('{} {}'.format(k, v))
+    print()
+    print('cg beacon times')
+    for k, v in cg_bcn_times.items():
+        print('{} {}'.format(k, v))
+    print()
+    print('mgb beacon times')
+    for k, v in mgb_bcn_times.items():
+        print('{} {}'.format(k, v))
     print()
 
 
@@ -131,9 +223,9 @@ for workload in workloads:
     cg_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'cg', WRKLDR_LOG_SUF)
     mgb_filename = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'mgb', WRKLDR_LOG_SUF)
 
-    sa_times, sa_total_time, sa_throughput    = parse_workloader_log(sa_filename)
-    cg_times, cg_total_time, cg_throughput    = parse_workloader_log(cg_filename)
-    mgb_times, mgb_total_time, mgb_throughput = parse_workloader_log(mgb_filename)
+    sa_times, sa_total_time, sa_throughput, sa_bcn_times     = parse_workloader_log(sa_filename)
+    cg_times, cg_total_time, cg_throughput, cg_bcn_times     = parse_workloader_log(cg_filename)
+    mgb_times, mgb_total_time, mgb_throughput, mgb_bcn_times = parse_workloader_log(mgb_filename)
 
     sa_job_times.extend(sa_times)
     cg_job_times.extend(cg_times)
@@ -147,4 +239,5 @@ for workload in workloads:
 
     #report_total_time_and_throughput(workload)
 
+report_beacon_times(sa_bcn_times, cg_bcn_times, mgb_bcn_times)
 report_avg_speedup_throughput_improvement_and_job_slowdown()
