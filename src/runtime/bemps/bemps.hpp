@@ -53,6 +53,13 @@ typedef struct {
   // scheduler.
   int max_batch_size;
 
+  // For jobs with dynamic job pressure, these variables can be read by a
+  // driver to help decide whether or not increase or decrease the number of
+  // running jobs. There's no lock. Drivers can re-read these values if they
+  // seem out-of-sync with their own internal numbers.
+  int jobs_running_on_gpu;
+  int jobs_waiting_on_gpu;
+
   // Lock and cond var for signaling the scheduler
   pthread_cond_t cond;
   pthread_mutex_t lock;
