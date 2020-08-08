@@ -288,6 +288,8 @@ void sched_mgb(void) {
   int tmp_dev_id;
   int *head_p;
   int *tail_p;
+  int *jobs_running_on_gpu;
+  int *jobs_waiting_on_gpu;
   int assigned;
   struct timespec ts;
   int boomers_len;
@@ -297,6 +299,8 @@ void sched_mgb(void) {
 
   head_p = &bemps_shm_p->gen->beacon_q_head;
   tail_p = &bemps_shm_p->gen->beacon_q_tail;
+  jobs_running_on_gpu = &bemps_shm_p->gen->jobs_running_on_gpu;
+  jobs_waiting_on_gpu = &bemps_shm_p->gen->jobs_waiting_on_gpu;
 
   while (1) {
     set_wakeup_time_ns(&ts);
@@ -350,10 +354,12 @@ void sched_mgb(void) {
                           << "from device " << tmp_dev_id << "\n");
           gpu_res_in_use[tmp_dev_id].mem_B += tmp_bytes_to_free;
           gpu_res_in_use[tmp_dev_id].cores += tmp_cores_to_free;
+          --*jobs_running_on_gpu;
         } else {
           stats.num_beacons++;
           boomers.push_back(comm);
           batch_size++;
+          ++*jobs_waiting_on_gpu;
         }
       }
 
@@ -408,6 +414,8 @@ void sched_mgb(void) {
         // GPU to prevent starving.
         comm->age++;
         boomers.push_back(comm);
+        // don't adjust jobs-waiting-on-gpu. it was incremented when job first
+        // went into the boomers list
       } else {
         long tmp_bytes_to_add = comm->beacon.mem_B;
         long tmp_cores_to_add = comm->beacon.cores;
@@ -425,6 +433,8 @@ void sched_mgb(void) {
         comm->sched_notif.device_id = target_dev_id;
         comm->state = BEMPS_BEACON_STATE_SCHEDULED_E;
         sem_post(&comm->sched_notif.sem);
+        ++*jobs_running_on_gpu;
+        --*jobs_waiting_on_gpu;
       }
     }
     bemps_stopwatch_end(&sched_stopwatches[SCHED_STOPWATCH_AWAKE]);
