@@ -27,7 +27,7 @@ workloads = [
     #'k80_large_16jobs_0',
     #'k80_large_16jobs_1',
     #'k80_large_16jobs_1',
-    'debug_05'
+    'debug_07'
 ]
 
 
@@ -176,8 +176,18 @@ def report_avg_speedup_throughput_improvement_and_job_slowdown():
     avg_cg_throughput_improvement  = statistics.mean(cg_throughput_improvements)
     avg_mgb_throughput_improvement = statistics.mean(mgb_throughput_improvements)
 
-    assert avg_cg_throughput_improvement  == avg_cg_speedup  # could fail due
-    assert avg_mgb_throughput_improvement == avg_mgb_speedup # to rounding error
+    if avg_cg_throughput_improvement != avg_cg_speedup:
+        print('POSSIBLE ERROR: avg cg throughput improvement and speedup ' \
+              'mismatch. This could be due to rounding error, or it could be ' \
+              'an actual bug')
+        print('  avg_cg_speedup {}'.format(avg_cg_speedup))
+        print('  avg_cg_throughput_improvement {}'.format(avg_cg_throughput_improvement))
+    if avg_mgb_throughput_improvement != avg_mgb_speedup:
+        print('POSSIBLE ERROR: avg cg throughput improvement and speedup ' \
+              'mismatch. This could be due to rounding error, or it could be ' \
+              'an actual bug')
+        print('  avg_mgb_speedup {}'.format(avg_mgb_speedup))
+        print('  avg_mgb_throughput_improvement {}'.format(avg_mgb_throughput_improvement))
     print('avg_cg_throughput_improvement {}'.format(avg_cg_throughput_improvement))
     print('avg_mgb_throughput_improvement {}'.format(avg_mgb_throughput_improvement))
 
@@ -219,9 +229,12 @@ sa_job_times    = []
 cg_job_times    = []
 mgb_job_times   = []
 for workload in workloads:
-    sa_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'single-assignment', WRKLDR_LOG_SUF)
-    cg_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'cg', WRKLDR_LOG_SUF)
-    mgb_filename = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'mgb', WRKLDR_LOG_SUF)
+    #sa_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'single-assignment', WRKLDR_LOG_SUF)
+    #cg_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'cg', WRKLDR_LOG_SUF)
+    #mgb_filename = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'mgb', WRKLDR_LOG_SUF)
+    sa_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'single-assignment.1', WRKLDR_LOG_SUF)
+    cg_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'cg.6', WRKLDR_LOG_SUF)
+    mgb_filename = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'mgb.48.10', WRKLDR_LOG_SUF)
 
     sa_times, sa_total_time, sa_throughput, sa_bcn_times     = parse_workloader_log(sa_filename)
     cg_times, cg_total_time, cg_throughput, cg_bcn_times     = parse_workloader_log(cg_filename)
