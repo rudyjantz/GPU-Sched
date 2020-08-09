@@ -5,6 +5,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <limits.h>
+#include <ctype.h>
 
 #include <algorithm>
 #include <iostream>
@@ -133,18 +134,13 @@ std::vector<int> avail_device_ids;
 //
 // C:G scheduler
 //
-// Number of CPU cores producing work for 1 GPU
-// FIXME This nasty, though, because the workload driver has to match this
-// exactly (or you'll get an error in the scheduler due to no available device)
-#define SCHED_CORE_TO_GPU_RATIO 6
-#define SCHED_JOBS_PER_GPU      SCHED_CORE_TO_GPU_RATIO // ...renaming as num jobs per GPU
-
 typedef struct {
     int device_id;
     int count;
 } device_id_count_t;
 std::map<pid_t, device_id_count_t *> pid_to_device_id_counts;
 std::list<device_id_count_t *> avail_device_id_counts;
+int CG_JOBS_PER_GPU = 0; // set by command-line args
 
 
 
@@ -162,11 +158,14 @@ struct gpu_res_s gpu_res_in_use[NUM_GPUS];
 void usage_and_exit(char *prog_name) {
   printf("\n");
   printf("Usage:\n");
-  printf("    %s [which_scheduler]\n", prog_name);
+  printf("    %s [which_scheduler] [jobs_per_gpu]\n", prog_name);
   printf("\n");
   printf(
-      "    where which_scheduler is one of zero, round-robin,\n"
-      "    round-robin-beacons, vector, single-assignment, cg, or mgb\n");
+      "    which_scheduler is one of zero, round-robin,\n"
+      "    round-robin-beacons, vector, single-assignment, cg, or mgb\n"
+      "    \n"
+      "    jobs_per_gpu is required and only valid for cg; it is an int that\n"
+      "    specifies the maximum number of jobs that can be run a GPU\n");
   printf("\n");
   printf("\n");
   exit(1);
@@ -456,7 +455,7 @@ void sched_cg(void) {
   for(i = 0; i < NUM_GPUS; i++){
     dc = (device_id_count_t *) malloc(sizeof(device_id_count_t));
     dc->device_id = i;
-    dc->count = SCHED_JOBS_PER_GPU;
+    dc->count = CG_JOBS_PER_GPU;
     avail_device_id_counts.push_back(dc);
   }
 
@@ -501,7 +500,7 @@ void sched_cg(void) {
         BEMPS_SCHED_LOG("pid(" << comm->pid << ") exiting.\n");
         BEMPS_SCHED_LOG("recycling device_id(" << dc->device_id << ").\n");
         dc->count++;
-        assert(dc->count <= SCHED_JOBS_PER_GPU); // error could mean problem with driver
+        assert(dc->count <= CG_JOBS_PER_GPU); // error could mean problem with driver
         avail_device_id_counts.sort(avail_devices_compare);
         pid_to_device_id_counts.erase(comm->pid);
         comm->exit_flag = 0;
@@ -520,7 +519,7 @@ void sched_cg(void) {
           // Found: Do nothing.
           // assert that at least one process (the one that sent this beacon)
           // is assigned to this device (i.e. count should be < max)
-          assert(pid_to_device_id_counts[comm->pid]->count < SCHED_JOBS_PER_GPU);
+          assert(pid_to_device_id_counts[comm->pid]->count < CG_JOBS_PER_GPU);
         }
 
         comm->state = BEMPS_BEACON_STATE_SCHEDULER_READ_E;
@@ -993,6 +992,7 @@ void sched(void) {
     sched_single_assignment();
   } else if (which_scheduler == SCHED_ALG_CG_E) {
     BEMPS_SCHED_LOG("Starting C:G scheduler\n");
+    BEMPS_SCHED_LOG("  CG_JOBS_PER_GPU: " << CG_JOBS_PER_GPU << "\n");
     sched_cg();
   } else if (which_scheduler == SCHED_ALG_MGB_E) {
     BEMPS_SCHED_LOG("Starting mgb scheduler\n");
@@ -1006,9 +1006,11 @@ void sched(void) {
 }
 
 void parse_args(int argc, char **argv) {
+  int i;
+
   max_batch_size = SCHED_DEFAULT_BATCH_SIZE;
 
-  if (argc > 2) {
+  if (argc > 3) {
     usage_and_exit(argv[0]);
   }
 
@@ -1030,10 +1032,23 @@ void parse_args(int argc, char **argv) {
     which_scheduler = SCHED_ALG_SINGLE_ASSIGNMENT_E;
   } else if (strncmp(argv[1], "cg", 3) == 0) {
     which_scheduler = SCHED_ALG_CG_E;
+    if (argc != 3) {
+        usage_and_exit(argv[0]);
+    }
+    for (i = 0; i < strlen(argv[2]); i++) {
+        if (!isdigit(argv[2][i])) {
+            usage_and_exit(argv[0]);
+        }
+    }
+    CG_JOBS_PER_GPU = atoi(argv[2]);
   } else if (strncmp(argv[1], "mgb", 4) == 0) {
     which_scheduler = SCHED_ALG_MGB_E;
     max_batch_size = SCHED_MGB_BATCH_SIZE;
   } else {
+    usage_and_exit(argv[0]);
+  }
+
+  if (which_scheduler != SCHED_ALG_CG_E && argc != 2) {
     usage_and_exit(argv[0]);
   }
 }
