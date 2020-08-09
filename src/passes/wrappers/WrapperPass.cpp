@@ -8,6 +8,74 @@
 
 using namespace llvm;
 
+void WrapperPass::createMallocWrapper(Module &M) {
+  auto &ctx = M.getContext();
+  Type *retTy = Type::getInt32Ty(ctx);
+  Type *ptrTy = Type::getInt8PtrTy(ctx)->getPointerTo();
+  Type *sizeTy = Type::getInt64Ty(ctx);
+  FunctionType *FTy = FunctionType::get(retTy, {ptrTy, sizeTy}, false);
+  MallocWrapper = M.getOrInsertFunction("cudaMallocWrapper", FTy);
+}
+
+void WrapperPass::createMemcpyWrapper(Module &M) {
+  auto &ctx = M.getContext();
+  Type *retTy = Type::getInt32Ty(ctx);
+  Type *dstTy = Type::getInt8PtrTy(ctx);
+  Type *srcTy = Type::getInt8PtrTy(ctx);
+  Type *sizeTy = Type::getInt64Ty(ctx);
+  Type *kindTy = Type::getInt32Ty(ctx);
+  FunctionType *FTy =
+      FunctionType::get(retTy, {dstTy, srcTy, sizeTy, kindTy}, false);
+  MemcpyWrapper = M.getOrInsertFunction("cudaMemcpyWrapper", FTy);
+}
+
+void WrapperPass::createMemsetWrapper(Module &M) {
+  auto &ctx = M.getContext();
+  Type *retTy = Type::getInt32Ty(ctx);
+  Type *dstTy = Type::getInt8PtrTy(ctx);
+  Type *valTy = Type::getInt32Ty(ctx);
+  Type *sizeTy = Type::getInt64Ty(ctx);
+  FunctionType *FTy = FunctionType::get(retTy, {dstTy, valTy, sizeTy}, false);
+  MemsetWrapper = M.getOrInsertFunction("cudaMemsetWrapper", FTy);
+}
+
+void WrapperPass::createMemcpyToSymbolWrapper(Module &M) {
+  auto &ctx = M.getContext();
+  Type *retTy = Type::getInt32Ty(ctx);
+  Type *dstTy = Type::getInt8PtrTy(ctx);
+  Type *srcTy = Type::getInt8PtrTy(ctx);
+  Type *sizeTy = Type::getInt64Ty(ctx);
+  Type *kindTy = Type::getInt32Ty(ctx);
+  FunctionType *FTy =
+      FunctionType::get(retTy, {dstTy, srcTy, sizeTy, sizeTy, kindTy}, false);
+  MemcpyToSymbolWrapper =
+      M.getOrInsertFunction("cudaMemcpyToSymbolWrapper", FTy);
+}
+
+void WrapperPass::createFreeWrapper(Module &M) {
+  auto &ctx = M.getContext();
+  Type *retTy = Type::getInt32Ty(ctx);
+  Type *ptrTy = Type::getInt8PtrTy(ctx);
+  FunctionType *FTy = FunctionType::get(retTy, {ptrTy}, false);
+  FreeWrapper = M.getOrInsertFunction("cudaFreeWrapper", FTy);
+}
+
+void WrapperPass::createKernelLaunchPrepare(Module &M) {
+  auto &ctx = M.getContext();
+  Type *Int32Ty = Type::getInt32Ty(ctx);
+  Type *Int64Ty = Type::getInt64Ty(ctx);
+  FunctionType *FTy =
+      FunctionType::get(Int32Ty, {Int64Ty, Int32Ty, Int64Ty, Int32Ty}, false);
+  KernelLaunchPrepare = M.getOrInsertFunction("cudaKernelLaunchPrepare", FTy);
+}
+
+void WrapperPass::createLookUp(Module &M) {
+  auto &ctx = M.getContext();
+  Type *Int8PtrTy = Type::getInt8PtrTy(ctx);
+  FunctionType *FTy = FunctionType::get(Int8PtrTy, {Int8PtrTy}, false);
+  LookUp = M.getOrInsertFunction("lookup", FTy);
+}
+
 void WrapperPass::replaceMalloc(CallInst *CI) {
   dbgs() << "repalcing Malloc : " << *CI << "\n\t" << *CI->getArgOperand(0)
          << "\n\t" << *CI->getArgOperand(1) << "\n\n";
@@ -35,10 +103,24 @@ void WrapperPass::replaceMemcpy(CallInst *CI) {
   CI->replaceAllUsesWith(ret);
 }
 
-void WrapperPass::replaceMemcpyToSymbol(CallInst *CI) {
-  dbgs() << "repalcing MemcpyToSymbol : " << *CI << "\n\t" << *CI->getArgOperand(0)
+void WrapperPass::replaceMemset(CallInst *CI) {
+  dbgs() << "repalcing Memset : " << *CI << "\n\t" << *CI->getArgOperand(0)
          << "\n\t" << *CI->getArgOperand(1) << "\n\t" << *CI->getArgOperand(2)
-         << "\n\t" << *CI->getArgOperand(3) << "\n\n";
+         << "\n\n";
+  IRBuilder<NoFolder> IRB(CI->getContext());
+  IRB.SetInsertPoint(CI);
+  SmallVector<Value *, 4> args;
+  args.push_back(CI->getArgOperand(0));
+  args.push_back(CI->getArgOperand(1));
+  args.push_back(CI->getArgOperand(2));
+  auto ret = IRB.CreateCall(MemsetWrapper, args);
+  CI->replaceAllUsesWith(ret);
+}
+
+void WrapperPass::replaceMemcpyToSymbol(CallInst *CI) {
+  dbgs() << "repalcing MemcpyToSymbol : " << *CI << "\n\t"
+         << *CI->getArgOperand(0) << "\n\t" << *CI->getArgOperand(1) << "\n\t"
+         << *CI->getArgOperand(2) << "\n\t" << *CI->getArgOperand(3) << "\n\n";
   IRBuilder<NoFolder> IRB(CI->getContext());
   IRB.SetInsertPoint(CI);
   SmallVector<Value *, 4> args;
@@ -73,45 +155,68 @@ void WrapperPass::addKernelLaunchPrepare(CallInst *CI) {
   args.push_back(CI->getArgOperand(1));
   args.push_back(CI->getArgOperand(2));
   args.push_back(CI->getArgOperand(3));
-  auto ret = IRB.CreateCall(KernelLaunchPrepare, args);
-  // CI->replaceAllUsesWith(ret);
+  IRB.CreateCall(KernelLaunchPrepare, args);
+}
+
+void WrapperPass::fixKernelParameters(CallInst *cudaPush) {
+  CallInst *Invoke = getKernelInvokeInst(cudaPush);
+  assert(Invoke);
+
+  auto &ctx = cudaPush->getContext();
+  IRBuilder<NoFolder> IRB(ctx);
+  IRB.SetInsertPoint(Invoke);
+
+  dbgs() << "Kernel Invoke: " << *Invoke;
+
+  for (int i = 0; i < Invoke->getNumArgOperands(); i++) {
+    auto arg = Invoke->getArgOperand(i);
+    if (arg->getType()->isPointerTy()) {
+      SmallVector<Value *, 1> ops;
+      auto tmp = IRB.CreateBitCast(arg, Type::getInt8PtrTy(ctx));
+      ops.push_back(tmp);
+      Value *lookup = IRB.CreateCall(LookUp, ops);
+      dbgs() << "\n\tfix [" << i << "]: " << *arg << " ---> " << *tmp << "\n";
+
+      if (lookup->getType() != arg->getType())
+        lookup = IRB.CreateBitCast(lookup, arg->getType());
+      Invoke->replaceUsesOfWith(arg, lookup);
+    }
+  }
+  Invoke->getParent()->dump();
+}
+
+CallInst *WrapperPass::getKernelInvokeInst(CallInst *cudaPush) {
+  int idx = 0;
+  Instruction *tmp = cudaPush->getNextNonDebugInstruction();
+
+  while (!isa<CallInst>(tmp)) {
+    if (isa<BranchInst>(tmp)) {
+      tmp = dyn_cast<BranchInst>(tmp)->getSuccessor(idx)->getFirstNonPHIOrDbg();
+    } else if (auto Cmp = dyn_cast<CmpInst>(tmp)) {
+      idx = 1 - Cmp->isTrueWhenEqual();
+      tmp = tmp->getNextNonDebugInstruction();
+    } else {
+      tmp = tmp->getNextNonDebugInstruction();
+    }
+  }
+  return dyn_cast<CallInst>(tmp);
 }
 
 bool WrapperPass::doInitialization(Module &M) {
   auto &ctx = M.getContext();
 
-  Type *sizeTy = Type::getInt64Ty(ctx);
-  Type *retTy = Type::getInt32Ty(ctx);
-
   // declare cudaMallocWrapper
-  Type *ptrTy = Type::getInt8PtrTy(ctx)->getPointerTo();
-  FunctionType *MallocWrapperFTy =
-      FunctionType::get(retTy, {ptrTy, sizeTy}, false);
-  MallocWrapper = M.getOrInsertFunction("cudaMallocWrapper", MallocWrapperFTy);
+  createMallocWrapper(M);
 
   // declare cudaMemcpyWrapper
-  Type *dstTy = Type::getInt8PtrTy(ctx);
-  Type *srcTy = Type::getInt8PtrTy(ctx);
-  Type *kindTy = Type::getInt32Ty(ctx);
-  FunctionType *MemcpyWrapperFTy =
-      FunctionType::get(retTy, {dstTy, srcTy, sizeTy, kindTy}, false);
-  MemcpyWrapper = M.getOrInsertFunction("cudaMemcpyWrapper", MemcpyWrapperFTy);
-
-  FunctionType *MemcpyToSymbolWrapperFTy =
-      FunctionType::get(retTy, {dstTy, srcTy, sizeTy, sizeTy, kindTy}, false);
-  MemcpyToSymbolWrapper = M.getOrInsertFunction("cudaMemcpyToSymbolWrapper",
-                                                MemcpyToSymbolWrapperFTy);
-
-  // declare cudaKernelLaunchPrepare()
-  // resuse sizeTy and retTy for int64_t and int32_t
-  FunctionType *KernelLaunchPrepareFTy =
-      FunctionType::get(retTy, {sizeTy, retTy, sizeTy, retTy}, false);
-  KernelLaunchPrepare =
-      M.getOrInsertFunction("cudaKernelLaunchPrepare", KernelLaunchPrepareFTy);
-
+  createMemcpyWrapper(M);
+  createMemsetWrapper(M);
+  createMemcpyToSymbolWrapper(M);
   // declare cudaFreeWrapper()
-  FunctionType *FreeFTy = FunctionType::get(retTy, {dstTy}, false);
-  FreeWrapper = M.getOrInsertFunction("cudaFreeWrapper", FreeFTy);
+  createFreeWrapper(M);
+  // declare cudaKernelLaunchPrepare()
+  createKernelLaunchPrepare(M);
+  createLookUp(M);
 
   return true;
 }
@@ -143,11 +248,15 @@ bool WrapperPass::runOnModule(Module &M) {
       } else if (name == "cudaMemcpyToSymbol") {
         replaceMemcpyToSymbol(CI);
         ToBeRemoved.push_back(CI);
+      } else if (name == "cudaMemset") {
+        replaceMemset(CI);
+        ToBeRemoved.push_back(CI);
       } else if (name == "cudaFree") {
         replaceFree(CI);
         ToBeRemoved.push_back(CI);
       } else if (name == "__cudaPushCallConfiguration") {
         addKernelLaunchPrepare(CI);
+        fixKernelParameters(CI);
       }
     }
     for (auto CI : ToBeRemoved) CI->eraseFromParent();

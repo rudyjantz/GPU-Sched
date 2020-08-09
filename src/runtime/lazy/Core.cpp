@@ -7,10 +7,7 @@
 // it is safe to assume it is not valid GPU address
 static uint64_t next_fake_addr = 0xffff800000000000;
 
-bool is_fake_addr(void* ptr) {
-  return (uint64_t)ptr >= 0xffff800000000000;
-}
-
+bool is_fake_addr(void* ptr) { return (uint64_t)ptr >= 0xffff800000000000; }
 
 bool Runtime::isAllocated(void* ptr) {
   return AllocatedMap.count((uint64_t)(ptr)) > 0;
@@ -22,7 +19,12 @@ void* Runtime::getValidAddrforFakeAddr(void* ptr) {
   return (void*)AllocatedMap[fake_addr];
 }
 
-void Runtime::registerMallocOp(void** holder, size_t size) {
+void* Runtime::getValidAddr(void* ptr) {
+  if (is_fake_addr(ptr)) return getValidAddrforFakeAddr(ptr);
+  return ptr;
+}
+
+cudaError_t Runtime::registerMallocOp(void** holder, size_t size) {
   uint64_t fake_addr = next_fake_addr++;
   auto* obj = new MObject((void*)fake_addr, size);
   auto* op = new MallocOp(obj);
@@ -32,22 +34,36 @@ void Runtime::registerMallocOp(void** holder, size_t size) {
 
   // return an fake address
   *holder = (void*)fake_addr;
+  return cudaSuccess;
 }
 
-void Runtime::registerMemcpyOp(void* dst, void* src, size_t size, enum cudaMemcpyKind k) {
-  uint64_t fake_addr; 
-  if (is_fake_addr(dst)) fake_addr = (uint64_t)dst;
-  else fake_addr = (uint64_t)src;
+cudaError_t Runtime::registerMemcpyOp(void* dst, void* src, size_t size,
+                                      enum cudaMemcpyKind k) {
+  uint64_t fake_addr;
+  if (is_fake_addr(dst))
+    fake_addr = (uint64_t)dst;
+  else
+    fake_addr = (uint64_t)src;
   auto* obj = MemObjects[fake_addr];
   auto* op = new MemcpyOp(src, obj, size, k);
   CudaMemOps[fake_addr].push_back(op);
+  return cudaSuccess;
 }
 
-void Runtime::registerMemcpyToSymbleOp(char* sym, void* src, size_t s, size_t o,
-                                       enum cudaMemcpyKind k) {
+cudaError_t Runtime::registerMemcpyToSymbleOp(char* sym, void* src, size_t s,
+                                              size_t o, enum cudaMemcpyKind k) {
   assert(k == cudaMemcpyHostToDevice);
   auto* op = new MemcpyToSymbolOp(sym, src, s, o, k);
   DeviceDependentOps.push_back(op);
+  return cudaSuccess;
+}
+
+cudaError_t Runtime::registerMemsetOp(void* ptr, int val, size_t s) {
+  uint64_t fake_addr = (uint64_t)ptr;
+  auto* obj = MemObjects[fake_addr];
+  auto* op = new MemsetOp(obj, val, s);
+  CudaMemOps[fake_addr].push_back(op);
+  return cudaSuccess;
 }
 
 int64_t Runtime::getAggMemSize() {
@@ -59,10 +75,10 @@ int64_t Runtime::getAggMemSize() {
 cudaError_t Runtime::prepare() {
   cudaError_t err = cudaSuccess;
   // perform actual memory alloc operations
-  for (auto it: CudaMemOps) {
+  for (auto it : CudaMemOps) {
     auto op = it.second[0];
     err = op->perform();
-    delete op; 
+    delete op;
     if (err != cudaSuccess) return err;
   }
 
@@ -88,7 +104,7 @@ cudaError_t Runtime::prepare() {
   }
 
   // perform other device dependent operations, e.g., cudaMemcpyToSytmble
-  for (auto op: DeviceDependentOps) {
+  for (auto op : DeviceDependentOps) {
     op->perform();
     delete op;
   }
@@ -100,13 +116,20 @@ cudaError_t Runtime::prepare() {
 }
 
 cudaError_t Runtime::free(void* ptr) {
-  uint64_t valid_addr = (uint64_t)(ptr);
-  uint64_t fake_addr = ReverseAllocatedMap[valid_addr];
+  uint64_t valid_addr;
+  uint64_t fake_addr;
+  if (is_fake_addr(ptr)) {
+    fake_addr = (uint64_t)ptr;
+    valid_addr = AllocatedMap[fake_addr];
+  } else {
+    valid_addr = (uint64_t)(ptr);
+    fake_addr = ReverseAllocatedMap[valid_addr];
+  }
   ReverseAllocatedMap.erase(valid_addr);
   AllocatedMap.erase(fake_addr);
   ActiveObjects.erase(valid_addr);
   if (ActiveObjects.empty()) enableIssue();
   // std::cerr << "perform cudaFree (toIssue for next kernel launch: " << issue
   // << ")\n";
-  return cudaFree(ptr);
+  return cudaFree((void *)valid_addr);
 }

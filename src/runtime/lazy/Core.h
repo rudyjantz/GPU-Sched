@@ -6,7 +6,7 @@
 #include <cassert>
 #include <cstdint>
 #include <iostream>
-#include <unordered_map>
+#include <map>
 #include <unordered_set>
 #include <vector>
 
@@ -18,12 +18,12 @@ using namespace std;
 class Runtime {
  private:
   bool issue;  // need to issue an beacon ?
-  unordered_map<uint64_t, MObject*> MemObjects;
-  unordered_map<uint64_t, std::vector<Operation*>> CudaMemOps;
+  map<uint64_t, MObject*> MemObjects;
+  map<uint64_t, std::vector<Operation*>> CudaMemOps;
 
   unordered_set<uint64_t> ActiveObjects;
-  unordered_map<uint64_t, uint64_t> AllocatedMap;
-  unordered_map<uint64_t, uint64_t> ReverseAllocatedMap;
+  map<uint64_t, uint64_t> AllocatedMap;
+  map<uint64_t, uint64_t> ReverseAllocatedMap;
   std::vector<Operation*> DeviceDependentOps;
 
  public:
@@ -34,12 +34,15 @@ class Runtime {
 
   bool isAllocated(void* ptr);
   void* getValidAddrforFakeAddr(void* ptr);
+  void* getValidAddr(void *addr);
 
-  void registerMallocOp(void** holder, size_t size);
-  void registerMemcpyOp(void* dst, void* src, size_t size,
+  cudaError_t registerMallocOp(void** holder, size_t size);
+  cudaError_t registerMemcpyOp(void* dst, void* src, size_t size,
                         enum cudaMemcpyKind k);
-  void registerMemcpyToSymbleOp(char* symble, void* src, size_t s, size_t o,
+  cudaError_t registerMemcpyToSymbleOp(char* symble, void* src, size_t s, size_t o,
                                 enum cudaMemcpyKind kind);
+  cudaError_t registerMemsetOp(void *ptr, int val, size_t size);
+
   int64_t getAggMemSize();
   cudaError_t prepare();
   cudaError_t free(void* devPtr);

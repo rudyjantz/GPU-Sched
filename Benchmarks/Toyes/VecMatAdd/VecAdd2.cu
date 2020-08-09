@@ -16,11 +16,15 @@ __global__ void VecAdd(double *A, double *B, double *C) {
   printf("A[%d] (%f) + B[%d] (%f) = C[%d] (%f)\n", i, A[i], i, B[i], i, C[i]);
 }
 
+void VecAddWrapper(double *d_A, double *d_B, double *d_C) {
+  dim3 ThreadsPerBlock(BLK);
+  dim3 BlocksPerGrid(N/BLK);
+  VecAdd<<<BlocksPerGrid, ThreadsPerBlock>>>(d_A, d_B, d_C);
+}
+
 int main(int argc, char **argv) {
   // A and B are input data, C is to store output data
   double A[N], B[N], C[N], sum = 0;
-  dim3 ThreadsPerBlock(BLK);
-  dim3 BlocksPerGrid(N/BLK);
   size_t size = N * sizeof(double);
 
   // initialize the input data
@@ -40,11 +44,11 @@ int main(int argc, char **argv) {
   cudaMemcpy(d_src[0], A, size, cudaMemcpyHostToDevice);
   cudaMemcpy(d_src[1], B, size, cudaMemcpyHostToDevice);
 
-  VecAdd<<<BlocksPerGrid, ThreadsPerBlock>>>(d_src[0], d_src[1], d_res);
   printf("Maturized: %p, %p, %p\n", d_src[0], d_src[1], d_res);
 
   // cudaMemcpy(d_src[1], d_res, size, cudaMemcpyDeviceToDevice);
   // VecAdd<<<BlocksPerGrid, ThreadsPerBlock>>>(d_src[0], d_src[1], d_res);
+  VecAddWrapper(d_src[0], d_src[1], d_res);
 
   cudaMemcpy(C, d_res, size, cudaMemcpyDeviceToHost);
 
