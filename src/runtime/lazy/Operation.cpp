@@ -1,20 +1,44 @@
 
 #include "Operation.h"
+
 #include <iostream>
 
 cudaError_t MallocOp::perform() {
-    uint64_t* fake_addr = (uint64_t *)*ptr_holder;
-    cudaError_t err = cudaMalloc(ptr_holder, devMem->size);
-    devMem->ptr = *ptr_holder;
-#if DEBUG 
-    fprintf(stderr, "Perform Actual cudaMalloc (holder: %p, fake addr: %p, valid addr: %p)\n",  ptr_holder, fake_addr, devMem->ptr); 
+  uint64_t* fake_addr = (uint64_t*)devMem->ptr;
+  cudaError_t err = cudaMalloc(&(devMem->ptr), devMem->size);
+#if DEBUG
+  fprintf(stderr, "    relay cudaMalloc(fake: %p, valid: %p)\n", fake_addr,
+          devMem->ptr);
 #endif
-    return err;
+  return err;
 }
 
 cudaError_t MemcpyOp::perform() {
+  cudaError_t err = cudaMemcpy(devMem->ptr, src, size, kind);
 #if DEBUG
-    fprintf(stderr, "Perform Actual cudaMemcpy (src: %p, dst: %p, size %ld)\n", src, devMem->ptr, size);
+  fprintf(stderr,
+          "    relay cudaMemcpy(dst: %p, src: %p, size: %ld, kind: %d)\n",
+          devMem->ptr, src, size, kind);
 #endif
-    return cudaMemcpy(devMem->ptr, src, size, cudaMemcpyHostToDevice);
+  return err;
+}
+
+cudaError_t MemcpyToSymbolOp::perform() {
+#if DEBUG
+  fprintf(stderr,
+          "    relay cudaMemcpyToSymbol (sym: %p, src: %p, size: %ld, offset: "
+          "%ld, kind: %d)\n",
+          symbol, buf, count, offset, kind);
+#endif
+  cudaError_t err = cudaMemcpyToSymbol(symbol, buf, count, offset, kind);
+  free(buf);
+  return err;
+}
+
+cudaError_t MemsetOp::perform() {
+#if DEBUG
+  fprintf(stderr, "    relay cudaMemset (ptr: %p, value: %d, size: %ld)\n",
+          devMem->ptr, value, count);
+#endif
+  return cudaMemset(devMem->ptr, value, count);
 }

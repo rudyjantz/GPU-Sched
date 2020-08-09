@@ -1334,7 +1334,7 @@ void coordsToPrintBuffers(MatchContext* ctx,
 	*nextqrychar = qrychar;
 	fprintf(stderr, "Allocing %d bytes of host memory for %d alignments\n",  alignmentOffset * sizeof(Alignment), numAlignments);
     *alignments = (struct Alignment *) calloc(alignmentOffset, sizeof(Alignment));
-	//cudaMallocHost((void**)alignments, numAlignments * sizeof(Alignment));
+	// cudaMallocHost((void**)alignments, numAlignments * sizeof(Alignment));
 }
 
 

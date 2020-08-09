@@ -1,15 +1,12 @@
-#Configure
-#CUDA_INSTALL_PATH ?= /usr/local/cuda
+include ../../common/make.config
+
 CUDA_INSTALL_PATH = $(CUDA_DIR)
 EXECUTABLE := dwt2d
 
 # Debug options
-dbg=0
-cudagdb=0 #compile for use with cuda-gdb, note that 'dbg' must be 1 as well
+dbg=1
+cudagdb=1 #compile for use with cuda-gdb, note that 'dbg' must be 1 as well
 performancetest=1
-
-# NVCC Options
-NVCCFLAGS += -arch sm_20
 
 # Files
 CFILES := 
@@ -27,33 +24,7 @@ COMMONFLAGS += $(INCLUDES)
 NVCCFLAGS += $(COMMONFLAGS)
 CXXFLAGS += $(COMMONFLAGS)
 CFLAGS += $(COMMONFLAGS) -std=c99 
-LDFLAGS += -L$(CUDA_INSTALL_PATH)/lib64 -lcudart
-
-# Warning flags (from cuda common.mk)
-CXXWARN_FLAGS := \
-	-W -Wall \
-	-Wimplicit \
-	-Wswitch \
-	-Wformat \
-	-Wchar-subscripts \
-	-Wparentheses \
-	-Wmultichar \
-	-Wtrigraphs \
-	-Wpointer-arith \
-	-Wcast-align \
-	-Wreturn-type \
-	-Wno-unused-function \
-	$(SPACE)
-
-CWARN_FLAGS := $(CXXWARN_FLAGS) \
-	-Wstrict-prototypes \
-	-Wmissing-prototypes \
-	-Wmissing-declarations \
-	-Wnested-externs \
-	-Wmain \
-
-CFLAGS += $(CWARN_FLAGS)
-CXXFLAGS += $(CXXWARN_FLAGS)
+LDFLAGS += -L$(CUDA_INSTALL_PATH)/lib64 -lcudart -lrt -L$(LAZY_LIB_DIR) -llazy
 
 # Debug/release flags
 ifeq ($(dbg),1)
@@ -66,7 +37,7 @@ ifeq ($(dbg),1)
         NVCCFLAGS += -G
     endif
 else 
-    COMMONFLAGS += -O2 
+    COMMONFLAGS += -O1 
     NVCCFLAGS   += --compiler-options -fno-strict-aliasing
     CXXFLAGS    += -fno-strict-aliasing
     CFLAGS      += -fno-strict-aliasing
@@ -83,9 +54,9 @@ endif
 OUTPUT = -DOUTPUT
 
 # Compilers
-CXX := g++
-CC := gcc
-LINK := g++ -fPIC
+CXX := clang++
+CC := clang
+LINK := clang++ -fPIC
 NVCC := $(CUDA_INSTALL_PATH)/bin/nvcc
 
 # Generate object files list
@@ -99,7 +70,10 @@ CUOBJS=$(CUFILES:.cu=.cu.o)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 %.cu.o: %.cu
-	$(NVCC) $(OUTPUT) $(NVCCFLAGS) -c $< -o $@
+	$(NVCC) $(OUTPUT) $(NVCCFLAGS) -ccbin $(CXX) -cuda $< -o $<.ii
+	$(CXX) $(CXXFLAGS) -S -emit-llvm $<.ii -o $<.ll
+	opt --lowerinvoke -load $(WRAPPER_PASS) -WP $<.ll -S -o $<.ll
+	$(CXX) $(CXXFLAGS) -c $<.ll -o $@
 
 %.cpp.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@

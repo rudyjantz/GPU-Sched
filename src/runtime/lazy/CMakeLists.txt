@@ -15,3 +15,7 @@ target_link_libraries(lazy ${LIBCUDART} bemps)
 if (DEBUG_LAZY)
     add_definitions(-DDEBUG)
 endif()
+
+if (DEBUG_NOLAZY)
+    add_definitions(-DNOLAZY)
+endif()

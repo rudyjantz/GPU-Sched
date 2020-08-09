@@ -7,44 +7,95 @@
 static Runtime R;
 static int id = 0;
 
-static bool is_fake_addr(void* ptr) {
-  return (uint64_t)ptr >= 0xffff800000000000;
-}
+extern bool is_fake_addr(void* ptr);
 
 extern "C" cudaError_t cudaMallocWrapper(void** devPtr, size_t size) {
+#if NOLAZY
+  cudaError_t err = cudaMalloc(devPtr, size);
+  fprintf(stderr, "cudaMalloc: %p (%ld)\n", *devPtr, size);
+  return err;
+#else
+
   R.registerMallocOp(devPtr, size);
 #if DEBUG
-  fprintf(stderr, "Delay a cudaMalloc (holder: %p, fake addr: %p)\n", devPtr,
+  fprintf(stderr, "\nDelay a cudaMalloc(holder: %p, fake: %p)\n", devPtr,
           *devPtr);
 #endif
   return cudaSuccess;
+
+#endif
 }
 
-extern "C" cudaError_t cudaMemcpyWrapper(void* dst, const void* src,
-                                         size_t count,
+extern "C" cudaError_t cudaMemcpyWrapper(void* dst, void* src, size_t count,
                                          enum cudaMemcpyKind kind) {
-  if (kind != cudaMemcpyHostToDevice || !is_fake_addr(dst)) {
-#if DEBUG
-    fprintf(stderr, "do actual cudaMemcpy for non-HostToDevice copy\n");
+#if NOLAZY
+  fprintf(stderr, "cudaMemcpy (%p, %p, %ld, %d)\n", dst, src, count, kind);
+  return cudaMemcpy(dst, src, count, kind);
 #endif
-    return cudaMemcpy(dst, src, count, kind);
-  } else if (R.isAllocated(dst)) {
+  if (is_fake_addr(dst) && R.isAllocated(dst))
     dst = R.getValidAddrforFakeAddr(dst);
+
+  if (is_fake_addr(src) && R.isAllocated(src))
+    src = R.getValidAddrforFakeAddr(src);
+
+  if ((kind == cudaMemcpyHostToDevice && !is_fake_addr(dst)) ||
+      (kind == cudaMemcpyDeviceToDevice && !is_fake_addr(dst) &&
+       !is_fake_addr(src)) ||
+      kind == cudaMemcpyDeviceToHost) {
 #if DEBUG
-    fprintf(stderr, "perform cudaMemcpy for allocated HostToDevice (dst: %p, src: %p)\n", dst, src);
+    fprintf(stderr,
+            "\nPerform a cudaMemcpy(dst: %p, src: %p, size: %ld, kind: %d)\n",
+            dst, src, count, kind);
 #endif
     return cudaMemcpy(dst, src, count, kind);
   } else {
+    R.registerMemcpyOp(dst, src, count, kind);
 #if DEBUG
-    fprintf(stderr, "Delay cudaMemcpy for HostToDevice (dst: %p, src: %p)\n", dst, src);
+    fprintf(stderr,
+            "\nDelay a cudaMemcpy(dst: %p, src: %p, size: %ld, kind: %d)\n",
+            dst, src, count, kind);
 #endif
-    R.registerMemcpyOp(dst, (void*)src, count);
     return cudaSuccess;
   }
 }
 
+extern "C" cudaError_t cudaMemsetWrapper(void* ptr, int val, size_t size) {
+#if NOLAZY
+  fprintf(stderr, "cudaMemset(%p, %d, %ld)\n", ptr, val, size);
+  return cudaMemset(ptr, val, size);
+#endif
+  if (is_fake_addr(ptr) && R.isAllocated(ptr))
+    ptr = R.getValidAddrforFakeAddr(ptr);
+  if (!is_fake_addr(ptr))
+    return cudaMemset(ptr, val, size);
+  else {
+#if DEBUG
+    fprintf(stderr, "\nDelay a cudaMemset(%p, %d, %ld)\n", ptr, val, size);
+#endif
+    return R.registerMemsetOp(ptr, val, size);
+  }
+}
+
+extern "C" cudaError_t cudaMemcpyToSymbolWrapper(char* sym, void* src,
+                                                 size_t count, size_t offset,
+                                                 enum cudaMemcpyKind kind) {
+#if NOLAZY
+  return cudaMemcpyToSymbol(sym, src, count, offset, kind);
+#endif
+#if DEBUG
+  fprintf(stderr, "\nDelay a cudaMemcpyToSymbol(%p, %p, %ld, %ld, %d)\n", sym,
+          src, count, offset, kind);
+#endif
+  R.registerMemcpyToSymbleOp(sym, src, count, offset, kind);
+  return cudaSuccess;
+}
+
 extern "C" cudaError_t cudaKernelLaunchPrepare(uint64_t gxy, int gz,
                                                uint64_t bxy, int bz) {
+#if NOLAZY
+  return cudaSuccess;
+#endif
+
   // TODO: here add code to call beacon
 #define U32X(v) (int)((v & 0xFFFFFFFF00000000LL) >> 32)
 #define U32Y(v) (int)(v & 0xFFFFFFFFLL)
@@ -55,8 +106,10 @@ extern "C" cudaError_t cudaKernelLaunchPrepare(uint64_t gxy, int gz,
   int64_t membytes = R.getAggMemSize();
 
 #if DEBUG
-  printf("A new kernel launch: \n\tgx: %d, gy: %d, gz: %d, bx: %d, by: %d, bz: "
-      "%d, mem: %ld, toIssue: %d\n",
+  printf(
+      "\n\nPrepare for a new kernel launch: \n\tgridDim(gx: %d, gy: %d, gz: %d)"
+      "\n\tblockDim(bx: %d, by: %d, bz: %d) \n\tmem: %ld, toIssue: %d"
+      "\n Preparing ...\n",
       gx, gy, gz, bx, by, bz, membytes, R.toIssue());
 #endif
 
@@ -68,6 +121,12 @@ extern "C" cudaError_t cudaKernelLaunchPrepare(uint64_t gxy, int gz,
 }
 
 extern "C" cudaError_t cudaFreeWrapper(void* devPtr) {
+#if NOLAZY
+  return cudaFree(devPtr);
+#endif
+#if DEBUG
+  printf("\ncudaFree(%p)\n", devPtr);
+#endif
   cudaError_t err = R.free(devPtr);
   if (R.toIssue()) {
     bemps_free(id);
@@ -76,14 +135,8 @@ extern "C" cudaError_t cudaFreeWrapper(void* devPtr) {
   return err;
 }
 
-// cudaError_t cudaMemcpyToSymbolWrapper(const char* symbol, const void* src,
-//                                       size_t count, size_t offset,
-//                                       enum cudaMemcpyKind kind) {
-//   return cudaMemcpyToSymbol(symbol, src, count, offset, kind);
-// }
-
-// ​cudaError_t cudaMallocHostWrapper(void** ptr, size_t size) {
-//   return cudaMallocHost(ptr, size);
-// }
+extern "C" void * lookup(void * addr) {
+  return R.getValidAddr(addr);
+}
 
 #endif

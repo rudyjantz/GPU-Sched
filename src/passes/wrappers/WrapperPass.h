@@ -19,13 +19,32 @@ class WrapperPass : public ModulePass {
  private:
   FunctionCallee MallocWrapper;
   FunctionCallee MemcpyWrapper;
-  FunctionCallee KernelLaunchPrepare;
+  FunctionCallee MemsetWrapper;
+  FunctionCallee MemcpyToSymbolWrapper;
   FunctionCallee FreeWrapper;
+  FunctionCallee KernelLaunchPrepare;
+  FunctionCallee LookUp;
+
+  void createMallocWrapper(Module &M);
+  void createMemcpyWrapper(Module &M);
+  void createMemsetWrapper(Module &M);
+  void createMemcpyToSymbolWrapper(Module &M);
+  void createFreeWrapper(Module &M);
+  void createKernelLaunchPrepare(Module &M);
+  void createLookUp(Module &M);
+
+  CallInst *getKernelInvokeInst(CallInst *cudaPush);
+
+
 
   void replaceMalloc(CallInst *CI);
   void replaceMemcpy(CallInst *CI);
+  void replaceMemset(CallInst *CI);
+  void replaceMemcpyToSymbol(CallInst *CI);
   void replaceFree(CallInst *CI);
   void addKernelLaunchPrepare(CallInst *CI);
+  void fixKernelParameters(CallInst *CI);
+
 
  public:
   static char ID;
