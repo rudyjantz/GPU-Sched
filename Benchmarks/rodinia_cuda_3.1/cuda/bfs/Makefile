@@ -10,7 +10,10 @@ EXE = bfs
 
 release: $(SRC)
 	$(CC) --cuda $(SRC) -o /tmp/bfs.ii
-	clang -Xclang -load -Xclang $(BEMPS_PASS) /tmp/bfs.ii -o $(EXE) -I$(INCLUDE) -L$(CUDA_LIB_DIR) -L$(BEMPS_LIB_DIR) -lbemps -lcudart -lrt -lm
+	clang -O1 -S -emit-llvm /tmp/bfs.ii -o /tmp/bfs.ll
+	opt --lowerinvoke -load $(WRAPPER_PASS) -WP /tmp/bfs.ll -S -o /tmp/bfs.ll
+	clang /tmp/bfs.ll -o $(EXE) -I$(INCLUDE) -L$(CUDA_LIB_DIR) -L$(LAZY_LIB_DIR) -lcudart -lrt -lm -llazy
+	# clang -Xclang -load -Xclang $(BEMPS_PASS) /tmp/bfs.ii -o $(EXE) -I$(INCLUDE) -L$(CUDA_LIB_DIR) -L$(BEMPS_LIB_DIR) -lbemps -lcudart -lrt -lm
 
 enum: $(SRC)
 	$(CC) -deviceemu $(SRC) -o $(EXE) -I$(INCLUDE) -L$(CUDA_LIB_DIR) 
