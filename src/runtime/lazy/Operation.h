@@ -45,13 +45,17 @@ class MallocOp : public Operation {
 // here we only interested in host to device copy
 class MemcpyOp : public Operation {
  private:
+  void *buf;
   void *src;
   size_t size;
   enum cudaMemcpyKind kind;
 
  public:
   MemcpyOp(void *src, MObject *dst, size_t s, enum cudaMemcpyKind k)
-      : src(src), size(s), kind(k), Operation(CUDA_MEMCPY, dst) {}
+      : src(src),size(s), kind(k), Operation(CUDA_MEMCPY, dst) {
+        buf = malloc(size);
+        memcpy(buf, src, size);
+      }
   cudaError_t perform() override;
 };
 

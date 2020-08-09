@@ -7,17 +7,18 @@ cudaError_t MallocOp::perform() {
   uint64_t* fake_addr = (uint64_t*)devMem->ptr;
   cudaError_t err = cudaMalloc(&(devMem->ptr), devMem->size);
 #if DEBUG
-  fprintf(stderr, "    relay cudaMalloc(fake: %p, valid: %p)\n", fake_addr,
+  fprintf(stderr, "    replayed cudaMalloc(fake: %p, valid: %p)\n", fake_addr,
           devMem->ptr);
 #endif
   return err;
 }
 
 cudaError_t MemcpyOp::perform() {
-  cudaError_t err = cudaMemcpy(devMem->ptr, src, size, kind);
+  cudaError_t err = cudaMemcpy(devMem->ptr, buf, size, kind);
+  free(buf);
 #if DEBUG
   fprintf(stderr,
-          "    relay cudaMemcpy(dst: %p, src: %p, size: %ld, kind: %d)\n",
+          "    replayed cudaMemcpy(dst: %p, src: %p, size: %ld, kind: %d)\n",
           devMem->ptr, src, size, kind);
 #endif
   return err;
