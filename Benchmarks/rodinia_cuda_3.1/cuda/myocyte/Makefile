@@ -34,7 +34,7 @@ main.o:	define.c \
 				file.c \
 				timer.c
 	# nvcc	main.cu -c -O3 -g
-	nvcc -ccbin clang --cuda main.cu -o /tmp/main.ii 
+	nvcc --cuda main.cu -o /tmp/main.ii 
 	clang -O1 -S -emit-llvm /tmp/main.ii -o /tmp/main.ll
 	opt -load $(WRAPPER_PASS) -WP /tmp/main.ll -S -o /tmp/main.ll
 	clang -c /tmp/main.ll -o main.o

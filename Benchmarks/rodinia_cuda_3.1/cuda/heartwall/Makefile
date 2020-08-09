@@ -10,7 +10,7 @@ heartwall: main.o ./AVI/avilib.o ./AVI/avimod.o
 
 # compile main function file into object (binary)
 main.o: main.cu kernel.cu define.c
-	nvcc $(OUTPUT) $(KERNEL_DIM) -ccbin clang -cuda main.cu -I./AVI -o /tmp/main.ii
+	nvcc $(OUTPUT) $(KERNEL_DIM) -cuda main.cu -I./AVI -o /tmp/main.ii
 	clang -O1 -S -emit-llvm /tmp/main.ii -o /tmp/main.ll
 	opt --lowerinvoke -load $(WRAPPER_PASS) -WP /tmp/main.ll -S -o /tmp/main.ll
 	clang /tmp/main.ll -c -fPIE -o main.o
