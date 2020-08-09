@@ -25,8 +25,9 @@ RESULTS_PATH=results
 
 WORKLOADS=(
     #debug_02.wl
-    debug_05.wl
+    #debug_05.wl
     #debug_06.wl
+    debug_07.wl
     #k80_small_16jobs_0.wl
     #k80_small_16jobs_1.wl
     #k80_medium_16jobs_0.wl
@@ -37,46 +38,93 @@ WORKLOADS=(
     ##random_01.wl
 )
 
-declare -A SCHED_ALG_TO_NUM_PROCS=(
-    #[single-assignment]=1
-    #[single-assignment]=2
-    #[cg]=6 # XXX Do not change this without changing SCHED_JOBS_PER_GPU in sched.cpp
-    [mgb]=12
+SINGLE_ASSIGNMENT_ARGS_ARR=(
+    1
+    #2
 )
+CG_ARGS_ARR=(
+    6 # XXX Do not change this without changing SCHED_JOBS_PER_GPU in sched.cpp
+    16 # XXX Do not change this without changing SCHED_JOBS_PER_GPU in sched.cpp
+)
+MGB_ARGS_ARR=(
+    6
+    16.10 # num procs and threshold K
+    48.10 # num procs and threshold K
+)
+
+
+declare -A SCHED_ALG_TO_ARGS_ARR=(
+    [single-assignment]="SINGLE_ASSIGNMENT_ARGS_ARR"
+    #[cg]="CG_ARGS_ARR"
+    #[mgb]="MGB_ARGS_ARR"
+)
+
+
+
 
 mkdir -p results
 
 
-for SCHED_ALG in "${!SCHED_ALG_TO_NUM_PROCS[@]}"; do
-    for WORKLOAD in ${WORKLOADS[@]}; do
-        WORKLOAD_NO_EXT=`basename $WORKLOAD .wl`
-        EXPERIMENT_BASENAME=${RESULTS_PATH}/${WORKLOAD_NO_EXT}.${SCHED_ALG}
-        NUM_PROCESSES=${SCHED_ALG_TO_NUM_PROCS[$SCHED_ALG]}
+for WORKLOAD in ${WORKLOADS[@]}; do
+    for SCHED_ALG in "${!SCHED_ALG_TO_ARGS_ARR[@]}"; do
 
-        echo "Launching scheduler for ${EXPERIMENT_BASENAME}"
-        ${BEMPS_SCHED_PATH}/bemps_sched ${SCHED_ALG} \
-          &> ${EXPERIMENT_BASENAME}.sched-log &
-        SCHED_PID=$!
-        echo "Scheduler is running with pid ${SCHED_PID}"
+        #echo ${SCHED_ALG}
+        ARGS_ARR_STR=${SCHED_ALG_TO_ARGS_ARR[$SCHED_ALG]}
+        #echo $ARGS_ARR_STR
+        eval ARGS_ARR=\${${ARGS_ARR_STR}[@]}
+        for ARGS in ${ARGS_ARR[@]}; do
+            #echo $ARGS
+            WORKLOAD_NO_EXT=`basename $WORKLOAD .wl`
+            #ARGS=${SCHED_ALG_TO_ARGS[$SCHED_ALG]}
+            EXPERIMENT_BASENAME=${RESULTS_PATH}/${WORKLOAD_NO_EXT}.${SCHED_ALG}.${ARGS}
 
-        echo "Launching workoader for ${EXPERIMENT_BASENAME} with ${NUM_PROCESSES} processes"
-        ${WORKLOADER_PATH}/workloader.py \
-          ${NUM_PROCESSES} \
-          ${WORKLOADS_PATH}/${WORKLOAD}  \
-          &> ${EXPERIMENT_BASENAME}.workloader-log &
-        WORKLOADER_PID=$!
-        echo "Workloader is running with pid ${WORKLOADER_PID}"
+            # yet another hack: cg needs to know jobs-per-cpu. And we need to
+            # be able to control it from this bash driver. So pass it along.
+            SCHED_ARGS=""
+            if [ "${SCHED_ALG}" == "cg" ]; then
+                SCHED_ARGS=${ARGS}
+                echo "was cg"
+            else
+                echo "bash blows"
+            fi
 
-        echo "Waiting for workloader to complete"
-        wait ${WORKLOADER_PID}
+            echo "Launching scheduler for ${EXPERIMENT_BASENAME}"
+            ${BEMPS_SCHED_PATH}/bemps_sched ${SCHED_ALG} ${SCHED_ARGS} \
+              &> ${EXPERIMENT_BASENAME}.sched-log &
+            SCHED_PID=$!
+            echo "Scheduler is running with pid ${SCHED_PID}"
 
-        echo "Workloader done"
-        echo "Killing scheduler"
-        kill -2 ${SCHED_PID}
-        sleep 1 # maybe a good idea before moving sched-stats.out
-        mv ./sched-stats.out ${EXPERIMENT_BASENAME}.sched-stats
+            # FIXME Adding a hacky sleep. We have an unsafe assumption, though we
+            # have yet to see a problem manifest: The scheduler needs to initialize
+            # the shared memory (bemps_sched_init()) before benchmarks run and try
+            # to open it (bemps_init()). When using mgbd (mgb with dynamic job
+            # pressure), the workloader itself could also fail without a sufficient
+            # delay here.
+            sleep 1
 
-        echo "Completed experiment for ${EXPERIMENT_BASENAME}"
+            echo "Launching workoader for ${EXPERIMENT_BASENAME}"
+            ${WORKLOADER_PATH}/workloader.py \
+              ${WORKLOADS_PATH}/${WORKLOAD}  \
+              ${SCHED_ALG} \
+              ${ARGS} \
+              &> ${EXPERIMENT_BASENAME}.workloader-log &
+            WORKLOADER_PID=$!
+            echo "Workloader is running with pid ${WORKLOADER_PID}"
+
+            echo "Waiting for workloader to complete"
+            wait ${WORKLOADER_PID}
+
+            echo "Workloader done"
+            echo "Killing scheduler"
+            kill -2 ${SCHED_PID}
+            sleep 1 # maybe a good idea before moving sched-stats.out
+            mv ./sched-stats.out ${EXPERIMENT_BASENAME}.sched-stats
+
+            echo "Completed experiment for ${EXPERIMENT_BASENAME}"
+
+
+        done
+
     done
 done
 
