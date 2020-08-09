@@ -30,7 +30,7 @@
 #include <errno.h>
 #include <sys/time.h>
 #include <unistd.h>
-#include <error.h>
+//#include <error.h>
 #include "dwt_cuda/dwt.h"
 #include "dwt_cuda/common.h"
 #include "dwt.h"
@@ -209,7 +209,7 @@ int writeLinear(T *component_cuda, int pixWidth, int pixHeight,
     strcpy(outfile+strlen(filename), suffix);
     i = open(outfile, O_CREAT|O_WRONLY, 0644);
     if (i == -1) {
-        error(0,errno,"cannot access %s", outfile);
+        //error(0,errno,"cannot access %s", outfile);
         return -1;
     }
     printf("\nWriting to %s (%d x %d)\n", outfile, pixWidth, pixHeight);
@@ -339,7 +339,7 @@ int writeNStage2DDWT(T *component_cuda, int pixWidth, int pixHeight,
     strcpy(outfile+strlen(filename), suffix);
     i = open(outfile, O_CREAT|O_WRONLY, 0644);
     if (i == -1) {
-        error(0,errno,"cannot access %s", outfile);
+        //error(0,errno,"cannot access %s", outfile);
         return -1;
     }
     printf("\nWriting to %s (%d x %d)\n", outfile, pixWidth, pixHeight);
