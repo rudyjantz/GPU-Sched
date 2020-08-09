@@ -114,7 +114,7 @@ extern "C" cudaError_t cudaKernelLaunchPrepare(uint64_t gxy, int gz,
 #endif
 
   if (R.toIssue()) {
-    bemps_begin(id, gx, gy, gz, bx, by, bz, membytes);
+    // bemps_begin(id, gx, gy, gz, bx, by, bz, membytes);
     R.disableIssue();
   }
   return R.prepare();
@@ -129,7 +129,7 @@ extern "C" cudaError_t cudaFreeWrapper(void* devPtr) {
 #endif
   cudaError_t err = R.free(devPtr);
   if (R.toIssue()) {
-    bemps_free(id);
+    // bemps_free(id);
     id++;
   }
   return err;
