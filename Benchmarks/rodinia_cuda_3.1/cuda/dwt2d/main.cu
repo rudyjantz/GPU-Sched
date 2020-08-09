@@ -25,7 +25,7 @@
  */
 
 #include <unistd.h>
-#include <error.h>
+//#include <error.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
@@ -68,7 +68,7 @@ int getImg(char * srcFilename, unsigned char *srcImg, int inputSize)
     //read image
     int i = open(srcFilename, O_RDONLY, 0644);
     if (i == -1) { 
-        error(0,errno,"cannot access %s", srcFilename);
+        //error(0,errno,"cannot access %s", srcFilename);
         return -1;
     }
     int ret = read(i, srcImg, inputSize);

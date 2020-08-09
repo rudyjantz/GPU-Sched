@@ -14,14 +14,14 @@ endif
 all: euler3d euler3d_double  pre_euler3d  pre_euler3d_double 
 
 euler3d: euler3d.cu
-	nvcc $(KERNEL_DIM) -ccbin clang -cuda -g euler3d.cu -o /tmp/euler3d.ii
+	nvcc $(KERNEL_DIM) -cuda -g euler3d.cu -o /tmp/euler3d.ii
 	clang -g -S -emit-llvm /tmp/euler3d.ii -o /tmp/euler3d.ll
 	opt --lowerinvoke -load $(WRAPPER_PASS) -WP /tmp/euler3d.ll -S -o /tmp/euler3d.ll
 	clang++ -g /tmp/euler3d.ll -o euler3d -L$(CUDA_LIB_DIR) -lcudart -lrt -L$(LAZY_LIB_DIR) -llazy
 	# nvcc $(KERNEL_DIM) -O2 -Xptxas -v euler3d.cu -o euler3d -I$(CUDA_SDK_PATH)/common/inc  -L$(CUDA_SDK_PATH)/lib $(CUTIL_LIB)
 
 euler3d_double: euler3d_double.cu
-	nvcc -ccbin clang -cuda -g euler3d_double.cu -o /tmp/euler3d_double.ii
+	nvcc -cuda -g euler3d_double.cu -o /tmp/euler3d_double.ii
 	clang -g -S -emit-llvm /tmp/euler3d_double.ii -o /tmp/euler3d_double.ll
 	opt --lowerinvoke -load $(WRAPPER_PASS) -WP /tmp/euler3d_double.ll -S -o /tmp/euler3d_double.ll
 	clang++ -g /tmp/euler3d_double.ll -o euler3d_double -L$(CUDA_LIB_DIR) -lcudart -lrt -L$(LAZY_LIB_DIR) -llazy
@@ -29,14 +29,14 @@ euler3d_double: euler3d_double.cu
 
 
 pre_euler3d: pre_euler3d.cu
-	nvcc -ccbin clang -cuda -g pre_euler3d.cu -o /tmp/pre_euler3d.ii
+	nvcc -cuda -g pre_euler3d.cu -o /tmp/pre_euler3d.ii
 	clang -g -S -emit-llvm /tmp/pre_euler3d.ii -o /tmp/pre_euler3d.ll
 	opt --lowerinvoke -load $(WRAPPER_PASS) -WP /tmp/pre_euler3d.ll -S -o /tmp/pre_euler3d.ll
 	clang++ -g /tmp/pre_euler3d.ll -o pre_euler3d -L$(CUDA_LIB_DIR) -lcudart -lrt -L$(LAZY_LIB_DIR) -llazy
 	# nvcc -Xptxas -v -O3 pre_euler3d.cu -o pre_euler3d -I$(CUDA_SDK_PATH)/common/inc  -L$(CUDA_SDK_PATH)/lib $(CUTIL_LIB)
 
 pre_euler3d_double: pre_euler3d_double.cu
-	nvcc -ccbin clang -cuda -g pre_euler3d_double.cu -o /tmp/pre_euler3d_double.ii
+	nvcc -cuda -g pre_euler3d_double.cu -o /tmp/pre_euler3d_double.ii
 	clang -g -S -emit-llvm /tmp/pre_euler3d_double.ii -o /tmp/pre_euler3d_double.ll
 	opt --lowerinvoke -load $(WRAPPER_PASS) -WP /tmp/pre_euler3d_double.ll -S -o /tmp/pre_euler3d_double.ll
 	clang++ -g /tmp/pre_euler3d_double.ll -o pre_euler3d_double -L$(CUDA_LIB_DIR) -lcudart -lrt -L$(LAZY_LIB_DIR) -llazy

@@ -70,7 +70,7 @@ CUOBJS=$(CUFILES:.cu=.cu.o)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 %.cu.o: %.cu
-	$(NVCC) $(OUTPUT) $(NVCCFLAGS) -ccbin $(CXX) -cuda $< -o $<.ii
+	$(NVCC) $(OUTPUT) $(NVCCFLAGS) -cuda $< -o $<.ii
 	$(CXX) $(CXXFLAGS) -S -emit-llvm $<.ii -o $<.ll
 	opt --lowerinvoke -load $(WRAPPER_PASS) -WP $<.ll -S -o $<.ll
 	$(CXX) $(CXXFLAGS) -c $<.ll -o $@
