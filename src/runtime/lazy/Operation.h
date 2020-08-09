@@ -46,12 +46,13 @@ class MallocOp : public Operation {
 class MemcpyOp : public Operation {
  private:
   void *buf;
+  void *src;
   size_t size;
   enum cudaMemcpyKind kind;
 
  public:
   MemcpyOp(void *src, MObject *dst, size_t s, enum cudaMemcpyKind k)
-      : size(s), kind(k), Operation(CUDA_MEMCPY, dst) {
+      : src(src),size(s), kind(k), Operation(CUDA_MEMCPY, dst) {
         buf = malloc(size);
         memcpy(buf, src, size);
       }

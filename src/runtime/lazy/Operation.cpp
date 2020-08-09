@@ -19,7 +19,7 @@ cudaError_t MemcpyOp::perform() {
 #if DEBUG
   fprintf(stderr,
           "    replayed cudaMemcpy(dst: %p, src: %p, size: %ld, kind: %d)\n",
-          devMem->ptr, buf, size, kind);
+          devMem->ptr, src, size, kind);
 #endif
   return err;
 }
