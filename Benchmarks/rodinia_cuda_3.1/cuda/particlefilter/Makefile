@@ -8,7 +8,7 @@ FLAGS := -g -O1 -Xclang -load -Xclang $(BEMPS_PASS)
 
 INCLUDE := $(CUDA_DIR)/include
 
-all: naive
+all: naive float
 
 naive: ex_particle_CUDA_naive_seq.cu
 	$(NVCC) --cuda $< -o /tmp/ex_particle_CUDA_naive_seq.ii
