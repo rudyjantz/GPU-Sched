@@ -4,7 +4,7 @@ include ../../common/make.config
 
 NVCC := $(CUDA_DIR)/bin/nvcc
 CC := clang
-FLAGS := -g -Xclang -load -Xclang $(BEMPS_PASS) 
+FLAGS := -g -O1 -Xclang -load -Xclang $(BEMPS_PASS) 
 
 INCLUDE := $(CUDA_DIR)/include
 
