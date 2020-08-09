@@ -16,3 +16,4 @@ Benchmarks/rodinia_cuda_3.1/cuda/particlefilter/particlefilter_naive
 Benchmarks/rodinia_cuda_3.1/cuda/srad/srad_v2/srad
 Tools/plotting/graphs
 Tools/plotting/*.in
+Benchmarks/rodinia_cuda_3.1/cuda/pathfinder/result.txt
