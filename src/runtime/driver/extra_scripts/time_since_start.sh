@@ -19,7 +19,7 @@ FILES=(
 
 
 echo "TIME_SINCE_START"
-echo "Sortedj-based-on-job-index"
+echo "Sorted-based-on-job-index"
 for FILE in ${FILES[@]}; do
     echo `basename ${FILE}`
     grep "TIME_SINCE_START" ${FILE} | awk '{print $4" "$5}' | sort -n
