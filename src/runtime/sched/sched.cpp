@@ -257,10 +257,10 @@ void dump_stats(void) {
   STATS_LOG("max_batch_size: " << max_batch_size << "\n");
   STATS_LOG("max_observed_batch_size: "<<stats.max_observed_batch_size<< "\n");
 #ifdef BEMPS_TIMING
-  STATS_LOG("count of awake times: " << sa->n << "\n");
-  STATS_LOG("min awake time (ns): " << sa->min << "\n");
-  STATS_LOG("max awake time (ns): " << sa->max << "\n");
-  STATS_LOG("avg awake time (ns): " << sa->avg << "\n");
+  STATS_LOG("count-of-awake-times: " << sa->n << "\n");
+  STATS_LOG("min-awake-time-(ns): " << sa->min << "\n");
+  STATS_LOG("max-awake-time-(ns): " << sa->max << "\n");
+  STATS_LOG("avg-awake-time-(ns): " << sa->avg << "\n");
 #endif
 
   stats_file.close();
