@@ -269,23 +269,31 @@ for workload in workloads:
     #mgb_filename = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'mgb.6', WRKLDR_LOG_SUF)
 
     if 'small' in workload:
+        print('small')
         sa_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'single-assignment.2', WRKLDR_LOG_SUF)
         cg_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'cg.6', WRKLDR_LOG_SUF)
         mgb_filename = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'mgb.24.10', WRKLDR_LOG_SUF)
     elif 'medium' in workload:
+        print('medium')
         sa_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'single-assignment.2', WRKLDR_LOG_SUF)
         cg_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'cg.4', WRKLDR_LOG_SUF)
         mgb_filename = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'mgb.16', WRKLDR_LOG_SUF)
     elif 'large' in workload:
+        print('large')
         sa_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'single-assignment.2', WRKLDR_LOG_SUF)
         cg_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'cg.3', WRKLDR_LOG_SUF)
         mgb_filename = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'mgb.8', WRKLDR_LOG_SUF)
     elif 'random' in workload:
+        print('random')
         sa_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'single-assignment.2', WRKLDR_LOG_SUF)
         cg_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'cg.6', WRKLDR_LOG_SUF)
         mgb_filename = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'mgb.8', WRKLDR_LOG_SUF)
     else:
         assert False
+    print(sa_filename)
+    print(cg_filename)
+    print(mgb_filename)
+    print()
 
     sa_times, sa_total_time, sa_throughput, sa_bcn_times     = parse_workloader_log(sa_filename)
     cg_times, cg_total_time, cg_throughput, cg_bcn_times     = parse_workloader_log(cg_filename)
