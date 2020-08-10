@@ -122,8 +122,8 @@ They carry the following meanings:
             The jobs from each group are randomly chosen.
             The order of jobs over the entire workload is random.
   - all: 100% of the jobs are in the workload. This is useful for debugging
-         Here, num_jobs will be ignored; it's just equal to the size of
-         all the jobs.
+         Here, num_jobs is still a required arg, but it's ignored; it'll just
+         be equal to the size of all the jobs.
 Here, "small", "medium", "large" refer to the max memory footprint
 possible for a given job. Job sizes:
   - small: all kernels < 10% GPU memory
