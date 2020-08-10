@@ -43,6 +43,11 @@ typedef struct {
 // A single type that captures all shared memory pointers between the bemps
 // library and the scheduler
 typedef struct {
+
+  // XXX Do not reorder this struct without taking into account
+  // jobs_running_on_gpu and jobs_waiting_on_gpu, and how the workloader gets
+  // their offset inside of read_shm()
+
   // The head index into the circuluar buffer of beacons
   int beacon_q_head;
 
@@ -57,6 +62,8 @@ typedef struct {
   // driver to help decide whether or not increase or decrease the number of
   // running jobs. There's no lock. Drivers can re-read these values if they
   // seem out-of-sync with their own internal numbers.
+  // XXX See comment at the top of this struct regarding workloader's
+  // read_shm() function and the offset of these struct members.
   int jobs_running_on_gpu;
   int jobs_waiting_on_gpu;
 
