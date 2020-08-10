@@ -13,7 +13,8 @@ def geomean(xs):
 
 #BASE_PATH = '/home/rudy/wo/gpu/bes-gpu/foo/scripts/cc/results-2020.08.01-7.30pm'
 #BASE_PATH = '/home/rudy/wo/gpu/GPU-Sched/src/runtime/driver/results'
-BASE_PATH = '/home/cc/GPU-Sched/src/runtime/driver/results'
+#BASE_PATH = '/home/cc/GPU-Sched/src/runtime/driver/results'
+BASE_PATH = '/home/rudy/wo/gpu/bes-gpu/foo/scripts/cc/results-2020.08.10-10.30am'
 
 SCHED_LOG_SUF  = 'sched-log'
 SCHED_STAT_SUF = 'sched-stats'
@@ -34,6 +35,9 @@ workloads = [
     #'k80_large_16jobs_1',
     #'debug_07'
     'p100_small_16jobs_3',
+    'p100_medium_16jobs_3',
+    'p100_large_16jobs_3',
+    'p100_random_16jobs_3',
 ]
 
 
@@ -45,6 +49,7 @@ def print_debug(s):
 
 
 def parse_workloader_log(filename):
+    #
     # Examples of what we're looking for:
     #
     # bmark times:
@@ -61,6 +66,11 @@ def parse_workloader_log(filename):
     #   12949252580741427 _bemps_dump_stats: min free time (ns): 68178
     #   12949252580742148 _bemps_dump_stats: max free time (ns): 68178
     #   12949252580742839 _bemps_dump_stats: avg free time (ns): 68178
+    #
+    # workloader process errors, which make the results invalid and will
+    # cause this parser to exit.
+    #   Worker 4 got error: 137
+    #
     COUNT_BEACON_STR = 'count of beacon times:'
     MIN_BEACON_STR = 'min beacon time (ns):'
     MAX_BEACON_STR = 'max beacon time (ns):'
@@ -69,6 +79,7 @@ def parse_workloader_log(filename):
     MIN_FREE_STR = 'min free time (ns):'
     MAX_FREE_STR = 'max free time (ns):'
     AVG_FREE_STR = 'avg free time (ns):'
+    WORKLOADER_ERROR_STR = "got error"
 
     # beacon times
     bt = {
@@ -131,6 +142,16 @@ def parse_workloader_log(filename):
                 count_free_flag -= 1
                 assert count_free_flag == 0
                 free_avgs.append((count_free, avg_free))
+            elif WORKLOADER_ERROR_STR in line:
+                print('Seeing error string "{}" in workload file {}'.format(
+                    WORKLOADER_ERROR_STR, filename))
+                print("This could be because the system's RAM was exhausted, " \
+                      "in which case the number of worker processes needs to " \
+                      "be reduced.")
+                print('If this is due to a bug in the scheduler or compiler, ' \
+                      'obviously this has to be resolved first.')
+                print('Exiting (due to invalid results)')
+                sys.exit(1)
 
     for count, avg in beacon_avgs:
         bt['avg_beacon'] += avg * count / num_beacons
