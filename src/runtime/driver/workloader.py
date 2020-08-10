@@ -88,7 +88,7 @@ def worker_main(q, active_jobs, jobs_processed, wid, experiment_start_time, jp_l
 
 
 def adjust_job_pressure(wid, jp_lock, jp_cond):
-    read_shm() # XXX Making some multiprocessing assumptions here. This could fail.
+    read_shm(wid) # XXX Making some multiprocessing assumptions here. This could fail.
 
     cpu_running_jobs = active_jobs.value - (gpu_running_jobs + gpu_waiting_jobs)
     if cpu_running_jobs > num_processes:
@@ -163,17 +163,18 @@ def read_workload_into_q(q, workload_file):
 def init_shm(fp):
     global shm
     shm = mmap.mmap(fp.fileno(), 0, flags=mmap.MAP_SHARED, prot=mmap.PROT_READ)
-    read_shm()
+    read_shm(0) # wid == 0... doesn't matter
 
 
-def read_shm():
+def read_shm(wid):
     global gpu_running_jobs, gpu_waiting_jobs
     byte_four = shm[12:16]
     byte_five = shm[16:20]
     gpu_running_jobs = struct.unpack('i', byte_four)[0]
     gpu_waiting_jobs = struct.unpack('i', byte_five)[0]
-    print_flush(gpu_running_jobs)
-    print_flush(gpu_waiting_jobs)
+    print_flush('Worker {}: Reading shared memory'.format(wid))
+    print_flush('Worker {}: gpu_running_jobs: {}'.format(wid, gpu_running_jobs))
+    print_flush('Worker {}: gpu_waiting_jobs: {}'.format(wid, gpu_waiting_jobs))
 
 
 print_flush('Parsing args')
