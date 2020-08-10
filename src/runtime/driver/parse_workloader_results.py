@@ -14,7 +14,8 @@ def geomean(xs):
 #BASE_PATH = '/home/rudy/wo/gpu/bes-gpu/foo/scripts/cc/results-2020.08.01-7.30pm'
 #BASE_PATH = '/home/rudy/wo/gpu/GPU-Sched/src/runtime/driver/results'
 #BASE_PATH = '/home/cc/GPU-Sched/src/runtime/driver/results'
-BASE_PATH = '/home/rudy/wo/gpu/bes-gpu/foo/scripts/cc/results-2020.08.10-10.30am'
+#BASE_PATH = '/home/rudy/wo/gpu/bes-gpu/foo/scripts/cc/results-2020.08.10-10.30am'
+BASE_PATH = '/home/cc/GPU-Sched/src/runtime/driver/results-2020.08.10-10.30am'
 
 SCHED_LOG_SUF  = 'sched-log'
 SCHED_STAT_SUF = 'sched-stats'
@@ -143,14 +144,13 @@ def parse_workloader_log(filename):
                 assert count_free_flag == 0
                 free_avgs.append((count_free, avg_free))
             elif WORKLOADER_ERROR_STR in line:
-                print('Seeing error string "{}" in workload file {}'.format(
-                    WORKLOADER_ERROR_STR, filename))
+                print('\nSeeing error string "{}" in workload file: ' \
+                       '\n\t{}\n'.format(WORKLOADER_ERROR_STR, filename))
                 print("This could be because the system's RAM was exhausted, " \
                       "in which case the number of worker processes needs to " \
-                      "be reduced.")
-                print('If this is due to a bug in the scheduler or compiler, ' \
-                      'obviously this has to be resolved first.')
-                print('Exiting (due to invalid results)')
+                      "be reduced. If this is due to a bug in the scheduler " \
+                      "or compiler, obviously this has to be resolved first.\n")
+                print('Exiting (due to invalid results)\n')
                 sys.exit(1)
 
     for count, avg in beacon_avgs:
@@ -229,16 +229,20 @@ def report_avg_speedup_throughput_improvement_and_job_slowdown():
     print('mean_mgb_job_slowdown {}'.format(avg_mgb_job_slowdown))
     print('geomean_mgb_job_slowdown {}'.format(geomean_mgb_job_slowdown))
     print()
+    print()
 
-    print('normalized_throughput_improvements sa cg mgb')
+    print('normalized_throughput_improvements')
+    print('. sa cg mgb')
     for idx, workload in enumerate(workloads):
         print('{} {} {} {}'.format(workload, 1, cg_throughput_improvements[idx],
                                   mgb_throughput_improvements[idx]))
     print('{} {} {} {}'.format('average', 1, avg_cg_throughput_improvement,
                                   avg_mgb_throughput_improvement))
     print()
+    print()
 
-    print('normalized_job_slowdowns sa cg mgb')
+    print('normalized_job_slowdowns')
+    print('. sa cg mgb')
     for idx, workload in enumerate(workloads):
         print('{} {} {} {}'.format(workload, 1, cg_job_slowdowns[idx], mgb_job_slowdowns[idx]))
     print('{} {} {} {}'.format('average', 1, avg_cg_job_slowdown, avg_mgb_job_slowdown))
@@ -259,9 +263,29 @@ for workload in workloads:
     #sa_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'single-assignment', WRKLDR_LOG_SUF)
     #cg_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'cg', WRKLDR_LOG_SUF)
     #mgb_filename = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'mgb', WRKLDR_LOG_SUF)
-    sa_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'single-assignment.2', WRKLDR_LOG_SUF)
-    cg_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'cg.6', WRKLDR_LOG_SUF)
-    mgb_filename = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'mgb.6', WRKLDR_LOG_SUF)
+
+    #sa_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'single-assignment.2', WRKLDR_LOG_SUF)
+    #cg_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'cg.6', WRKLDR_LOG_SUF)
+    #mgb_filename = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'mgb.6', WRKLDR_LOG_SUF)
+
+    if 'small' in workload:
+        sa_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'single-assignment.2', WRKLDR_LOG_SUF)
+        cg_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'cg.6', WRKLDR_LOG_SUF)
+        mgb_filename = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'mgb.24.10', WRKLDR_LOG_SUF)
+    elif 'medium' in workload:
+        sa_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'single-assignment.2', WRKLDR_LOG_SUF)
+        cg_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'cg.4', WRKLDR_LOG_SUF)
+        mgb_filename = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'mgb.16', WRKLDR_LOG_SUF)
+    elif 'large' in workload:
+        sa_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'single-assignment.2', WRKLDR_LOG_SUF)
+        cg_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'cg.3', WRKLDR_LOG_SUF)
+        mgb_filename = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'mgb.8', WRKLDR_LOG_SUF)
+    elif 'random' in workload:
+        sa_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'single-assignment.2', WRKLDR_LOG_SUF)
+        cg_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'cg.6', WRKLDR_LOG_SUF)
+        mgb_filename = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'mgb.8', WRKLDR_LOG_SUF)
+    else:
+        assert False
 
     sa_times, sa_total_time, sa_throughput, sa_bcn_times     = parse_workloader_log(sa_filename)
     cg_times, cg_total_time, cg_throughput, cg_bcn_times     = parse_workloader_log(cg_filename)
