@@ -24,7 +24,7 @@ RESULTS_PATH=results
 
 
 WORKLOADS=(
-    all_jobs_0.wl
+    #all_jobs_0.wl
     #debug_02.wl
     #debug_05.wl
     #debug_06.wl
@@ -37,27 +37,39 @@ WORKLOADS=(
     #k80_large_16jobs_1.wl
     ##random_00.wl
     ##random_01.wl
+    #p100_small_16jobs_3.wl
+    p100_medium_16jobs_3.wl
+    #p100_large_16jobs_3.wl
+    #p100_random_16jobs_3.wl
 )
 
 SINGLE_ASSIGNMENT_ARGS_ARR=(
-    1
+    #1
     #2
 )
 CG_ARGS_ARR=(
-    6 # XXX Do not change this without changing SCHED_JOBS_PER_GPU in sched.cpp
-    16 # XXX Do not change this without changing SCHED_JOBS_PER_GPU in sched.cpp
+    #3
+    #4
+    #6
+    #12
+    #24
 )
 MGB_ARGS_ARR=(
-    6
-    16.10 # num procs and threshold K
-    48.10 # num procs and threshold K
+    #6
+    #8
+    #10
+    #12
+    16
+    #24
+    #24.10 # num procs . max jobs waiting for GPU
+    #48.10 # num procs . max jobs waiting for GPU
 )
 
 
 declare -A SCHED_ALG_TO_ARGS_ARR=(
     [single-assignment]="SINGLE_ASSIGNMENT_ARGS_ARR"
-    #[cg]="CG_ARGS_ARR"
-    #[mgb]="MGB_ARGS_ARR"
+    [cg]="CG_ARGS_ARR"
+    [mgb]="MGB_ARGS_ARR"
 )
 
 
