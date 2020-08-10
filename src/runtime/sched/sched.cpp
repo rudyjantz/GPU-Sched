@@ -91,6 +91,20 @@ const long GTX_1080_TOTAL_MEM_KB = 8116L * 1024;
   } while (0)
 #endif
 
+
+const int SCHED_ALIVE_COUNT_MAX = 30; // roughly 5s, assuming 100ms timer and 0 beacons
+int SCHED_ALIVE_COUNT = 0;
+#define ALIVE_MSG()                              \
+  do {                                                \
+    if (SCHED_ALIVE_COUNT == SCHED_ALIVE_COUNT_MAX) { \
+      BEMPS_SCHED_LOG("alive\n");                     \
+      SCHED_ALIVE_COUNT = 0;                          \
+    } else {                                          \
+      SCHED_ALIVE_COUNT++;                            \
+    }                                                 \
+  } while(0)
+
+
 #define SCHED_NUM_STOPWATCHES 1
 typedef enum {
   SCHED_STOPWATCH_AWAKE = 0 // time the scheduler spends awake and processing
@@ -201,13 +215,13 @@ static inline void set_wakeup_time_ns(struct timespec *ts_p) {
   }
 
   // won't overflow
-  BEMPS_SCHED_LOG("BEMP_SCHED_TIMEOUT_NS: " << BEMPS_SCHED_TIMEOUT_NS << "\n");
+  //BEMPS_SCHED_LOG("BEMP_SCHED_TIMEOUT_NS: " << BEMPS_SCHED_TIMEOUT_NS << "\n");
   ts_p->tv_nsec = now.tv_nsec + BEMPS_SCHED_TIMEOUT_NS;
   ts_p->tv_sec = now.tv_sec + ts_p->tv_nsec / 1000000000UL;
   ts_p->tv_nsec = ts_p->tv_nsec % 1000000000UL;
 
-  BEMPS_SCHED_LOG("now s:  " << now.tv_sec << "\n");
-  BEMPS_SCHED_LOG("ts_p s: " << ts_p->tv_sec << "\n");
+  //BEMPS_SCHED_LOG("now s:  " << now.tv_sec << "\n");
+  //BEMPS_SCHED_LOG("ts_p s: " << ts_p->tv_sec << "\n");
 }
 
 void consume_beacon(bemps_beacon_t *beacon_p) {
@@ -313,12 +327,15 @@ void sched_mgb(void) {
     pthread_mutex_unlock(&bemps_shm_p->gen->lock);
     bemps_stopwatch_start(&sched_stopwatches[SCHED_STOPWATCH_AWAKE]);
 
+    ALIVE_MSG();
+
     // First loop: Catch the scheduler's tail back up with the beacon
     // queue's head. If we see a free-beacon, then reclaim that resource.
-    BEMPS_SCHED_LOG("*head_p: " << (*head_p) << "\n");
-    BEMPS_SCHED_LOG("*tail_p: " << (*tail_p) << "\n");
+    //BEMPS_SCHED_LOG("*head_p: " << (*head_p) << "\n");
+    //BEMPS_SCHED_LOG("*tail_p: " << (*tail_p) << "\n");
     batch_size = 0;
     while (*tail_p != *head_p) {
+      BEMPS_SCHED_LOG("*head_p: " << (*head_p) << "\n");
       BEMPS_SCHED_LOG("*tail_p: " << (*tail_p) << "\n");
 
       comm = &bemps_shm_p->comm[*tail_p];
@@ -377,7 +394,9 @@ void sched_mgb(void) {
     if (boomers_len > stats.max_len_boomers) {
       stats.max_len_boomers = boomers_len;
     }
-    BEMPS_SCHED_LOG("boomers_len: " << boomers_len << "\n");
+    if (boomers_len > 0) {
+      BEMPS_SCHED_LOG("boomers_len: " << boomers_len << "\n");
+    }
     for (i = 0; i < boomers_len; i++) {
       assigned = 0;
       comm = boomers.front();
@@ -472,12 +491,14 @@ void sched_cg(void) {
     // randomly from time to time before the batch is ready
     rc = pthread_cond_timedwait(&bemps_shm_p->gen->cond,
                                 &bemps_shm_p->gen->lock, &ts);
-    BEMPS_SCHED_LOG("rc from timedwait: " << rc << "\n");
-    BEMPS_SCHED_LOG("strerror of rc: " << strerror(rc) << "\n");
+    //BEMPS_SCHED_LOG("rc from timedwait: " << rc << "\n");
+    //BEMPS_SCHED_LOG("strerror of rc: " << strerror(rc) << "\n");
     pthread_mutex_unlock(&bemps_shm_p->gen->lock);
 
-    BEMPS_SCHED_LOG("Woke up\n");
+    //BEMPS_SCHED_LOG("Woke up\n");
     bemps_stopwatch_start(&sched_stopwatches[SCHED_STOPWATCH_AWAKE]);
+
+    ALIVE_MSG();
 
     // catch the scheduler's tail back up with the beacon queue's head
     while (*tail_p != *head_p) {
@@ -561,11 +582,12 @@ void sched_single_assignment(void) {
     // randomly from time to time before the batch is ready
     rc = pthread_cond_timedwait(&bemps_shm_p->gen->cond,
                                 &bemps_shm_p->gen->lock, &ts);
-    BEMPS_SCHED_LOG("rc from timedwait: " << rc << "\n");
-    BEMPS_SCHED_LOG("strerror of rc: " << strerror(rc) << "\n");
+    //BEMPS_SCHED_LOG("rc from timedwait: " << rc << "\n");
+    //BEMPS_SCHED_LOG("strerror of rc: " << strerror(rc) << "\n");
     pthread_mutex_unlock(&bemps_shm_p->gen->lock);
 
-    BEMPS_SCHED_LOG("Woke up\n");
+    //BEMPS_SCHED_LOG("Woke up\n");
+    ALIVE_MSG();
 
     // catch the scheduler's tail back up with the beacon queue's head
     while (*tail_p != *head_p) {
