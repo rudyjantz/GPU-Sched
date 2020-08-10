@@ -9,6 +9,7 @@
 #include "master.cu"
 #include "embedded_fehlberg_7_8.cu"
 #include "solver.cu"
+#include "gt_path_hack.h"
 
 //====================================================================================================100
 //	MAIN FUNCTION
@@ -123,7 +124,7 @@ int work(	int xmax,
 
 	// y
 	for(i=0; i<workload; i++){
-		read(	"../../data/myocyte/y.txt",
+		read(	BASE_DATA_PATH"/y.txt",
 					y[i][0],
 					EQUATIONS,
 					1,
@@ -132,7 +133,7 @@ int work(	int xmax,
 
 	// params
 	for(i=0; i<workload; i++){
-		read("../../data/myocyte/params.txt",
+		read(BASE_DATA_PATH"/params.txt",
 					params[i],
 					PARAMETERS,
 					1,

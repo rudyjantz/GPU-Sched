@@ -8,6 +8,7 @@
 #include "kernel_2.cu"
 #include "embedded_fehlberg_7_8_2.cu"
 #include "solver_2.cu"
+#include "gt_path_hack.h"
 
 //====================================================================================================100
 //		MAIN FUNCTION
@@ -168,7 +169,7 @@ int work_2(	int xmax,
 
 	for(i=0; i<workload; i++){
 		pointer = i*((xmax+1)*EQUATIONS) + 0*(EQUATIONS);
-		read("../../data/myocyte/y.txt",
+		read(BASE_DATA_PATH"/y.txt",
 					&y[pointer],
 					91,
 					1,
@@ -182,7 +183,7 @@ int work_2(	int xmax,
 
 	for(i=0; i<workload; i++){
 		pointer = i*PARAMETERS;
-		read("../../data/myocyte/params.txt",
+		read(BASE_DATA_PATH"/params.txt",
 					&params[pointer],
 					18,
 					1,
