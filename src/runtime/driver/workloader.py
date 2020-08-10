@@ -43,6 +43,9 @@ def run_benchmark(cmd, wid, active_jobs):
     o, e = proc.communicate()
     rc = proc.returncode
     if rc != 0:
+        # XXX Don't change the "got error" string without changing the results
+        # parser (and possibly other code to follow). This is what we look for
+        # when checking for workloader process errors now.
         print_flush('Worker {} got error: {}'.format(wid, rc))
         print_flush('Worker {} dumping error: {}'.format(wid, e.decode('utf-8')))
     else:
