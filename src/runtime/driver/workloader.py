@@ -44,7 +44,7 @@ def run_benchmark(cmd, wid, active_jobs):
     rc = proc.returncode
     if rc != 0:
         print_flush('Worker {} got error: {}'.format(wid, rc))
-        print_flush('Worker {} dumping error: {}'.format(e.decode('utf-8')))
+        print_flush('Worker {} dumping error: {}'.format(wid, e.decode('utf-8')))
     else:
         print_flush('suc')
     print_flush(o.decode('utf-8'))

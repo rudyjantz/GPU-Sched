@@ -4,8 +4,8 @@ import sys
 import random
 import time
 
-BASE_PATH = '/home/rudy/wo/gpu'
-BASE_PATH = '/home/cc/'
+#BASE_PATH = '/home/rudy/wo/gpu'
+BASE_PATH = '/home/cc'
 RODINIA_BMARK_PATH = BASE_PATH+'/GPU-Sched/Benchmarks/rodinia_cuda_3.1/cuda'
 RODINIA_DATA_PATH  = BASE_PATH+'/GPU-Sched/Benchmarks/rodinia_cuda_3.1/data'
 
@@ -22,16 +22,16 @@ GPU_TO_MEM = {
 all_jobs = [
     # ~ 10 MB
     (  10074152, 'particlefilter/particlefilter_float -x 256 -y 256 -z 100 -np 10000'),
-    (  20477952, 'cfd/euler3d {}/cfd/missile.domn.0.2M'.format(RODINIA_DATA_PATH))
+    (  20477952, 'cfd/euler3d {}/cfd/missile.domn.0.2M'.format(RODINIA_DATA_PATH)),
     (  20523432, 'b+tree/b+tree.out file {}/b+tree/mil.txt ' \
                  'command {}/b+tree/command.txt'.format(RODINIA_DATA_PATH,
                                                         RODINIA_DATA_PATH)),
-    (  32505856, 'dwt2d/dwt2d rgb.bmp -d 1024x1024 -f -5 -l 3'),
+    (  32505856, 'dwt2d/dwt2d {}/dwt2d/rgb.bmp -d 1024x1024 -f -5 -l 3'.format(RODINIA_DATA_PATH)),
     (  33587208, 'nw/needle 2048 10'),
     (  37464000, 'myocyte/myocyte.out 1000 100 1'),
     (  38999881, 'bfs/bfs {}/bfs/graph1MW_6.txt'.format(RODINIA_DATA_PATH)),
-    (  40400000, 'pathfinder/pathfinder 100000 100 20 > result.txt'),
-    (  43350996, 'heartwall/heartwall {}/heartwall/test.avi 20'.format(RODINIA_DATA_PATH),
+    (  40400000, 'pathfinder/pathfinder 100000 100 20'),
+    (  43350996, 'heartwall/heartwall {}/heartwall/test.avi 20'.format(RODINIA_DATA_PATH)),
     (  48000000, 'particlefilter/particlefilter_naive ' \
                  '-x 128 -y 128 -z 10 -np 1000000'),
     (  50331648, 'hotspot/hotspot 2048 2 2 {}/hotspot/gt_temp_2048 ' \
@@ -43,7 +43,7 @@ all_jobs = [
     # ~ 100 MB
     ( 100663296, 'srad/srad_v2/srad 2048 2048 0 127 0 127 0.5 2'),
     ( 104893352, 'particlefilter/particlefilter_float -x 1024 -y 1024 -z 100 -np 100'),
-    ( 130023424, 'dwt2d/dwt2d rgb.bmp -d 2048x2048 -f -5 -l 3'),
+    ( 130023424, 'dwt2d/dwt2d {}/dwt2d/rgb.bmp -d 2048x2048 -f -5 -l 3'.format(RODINIA_DATA_PATH)),
     ( 134283272, 'nw/needle 4096 10'),
     ( 210834320, 'b+tree/b+tree.out file {}/b+tree/mil_gt.txt command ' \
                  '{}/b+tree/command_gt.txt'.format(RODINIA_DATA_PATH,
@@ -55,10 +55,10 @@ all_jobs = [
                                                   RODINIA_DATA_PATH)),
     ( 327148809, 'bfs/bfs {}/bfs/inputGen/graph8M.txt'.format(RODINIA_DATA_PATH)),
     ( 374640000, 'myocyte/myocyte.out 1000 1000 1'),
-    ( 400400000, 'pathfinder/pathfinder 100000 1000 20 > result.txt'),
+    ( 400400000, 'pathfinder/pathfinder 100000 1000 20'),
     ( 402653184, 'srad/srad_v2/srad 4096 4096 0 127 0 127 0.5 2'),
     ( 419466152, 'particlefilter/particlefilter_float -x 2048 -y 2048 -z 100 -np 100'),
-    ( 520093696, 'dwt2d/dwt2d rgb.bmp -d 4096x4096 -f -5 -l 3'),
+    ( 520093696, 'dwt2d/dwt2d {}/dwt2d/rgb.bmp -d 4096x4096 -f -5 -l 3'.format(RODINIA_DATA_PATH)),
     ( 537001992, 'nw/needle 8192 10'),
     ( 589299988, 'backprop/backprop 4194304'),
     ( 654310889, 'bfs/bfs {}/bfs/inputGen/graph16M.txt'.format(RODINIA_DATA_PATH)),
@@ -66,14 +66,14 @@ all_jobs = [
     (1176502548, 'backprop/backprop 8388608'),
     (1308592369, 'bfs/bfs {}/bfs/inputGen/graph32M.txt'.format(RODINIA_DATA_PATH)),
     (1610612736, 'srad/srad_v2/srad 8192 8192 0 127 0 127 0.5 2'),
-    (2080374784, 'dwt2d/dwt2d rgb.bmp -d 8192x8192 -f -5 -l 3'),
+    (2080374784, 'dwt2d/dwt2d {}/dwt2d/rgb.bmp -d 8192x8192 -f -5 -l 3'.format(RODINIA_DATA_PATH)),
     (2147745800, 'nw/needle 16384 10'),
     (2350907668, 'backprop/backprop 16777216'),
     (3686640000, 'myocyte/myocyte.out 10000 1000 1'),
     (4699717908, 'backprop/backprop 33554432'),
     (6442450944, 'srad/srad_v2/srad 16384 16384 0 127 0 127 0.5 2'),
     (7856000000, 'lavaMD/lavaMD -boxes1d 100'),
-    (8321499136, 'dwt2d/dwt2d rgb.bmp -d 16384x16384 -f -5 -l 3'),
+    (8321499136, 'dwt2d/dwt2d {}/dwt2d/rgb.bmp -d 16384x16384 -f -5 -l 3'.format(RODINIA_DATA_PATH)),
     (8590458888, 'nw/needle 32768 10'),
     (9397338388, 'backprop/backprop 67108864'),
     #(25769803776, 'srad/srad_v2/srad 32768 32768 0 127 0 127 0.5 2'), # seems halved to 12GB
@@ -113,6 +113,7 @@ It must be one of the following values:
   - medium
   - large
   - random
+  - all
 They carry the following meanings:
   - small: 100% of the jobs are small
   - medium: 100% of the jobs are medium
@@ -120,6 +121,9 @@ They carry the following meanings:
   - random: ~33% of the jobs are of each size (small, medium, or large).
             The jobs from each group are randomly chosen.
             The order of jobs over the entire workload is random.
+  - all: 100% of the jobs are in the workload. This is useful for debugging
+         Here, num_jobs will be ignored; it's just equal to the size of
+         all the jobs.
 Here, "small", "medium", "large" refer to the max memory footprint
 possible for a given job. Job sizes:
   - small: all kernels < 10% GPU memory
@@ -149,7 +153,7 @@ def parse_args():
     if gpu not in GPU_TO_MEM:
         usage_and_exit()
     job_size = sys.argv[2]
-    if job_size not in ['small', 'medium', 'large', 'random']:
+    if job_size not in ['small', 'medium', 'large', 'random', 'all']:
         usage_and_exit()
     num_jobs = sys.argv[3]
     if not num_jobs.isdigit():
@@ -217,6 +221,8 @@ construct_job_arrays(gpu)
 
 if job_size == 'random':
     workload = generate_random_workload()
+elif job_size == 'all':
+    _, workload = zip(*all_jobs)
 else:
     workload = generate_workload()
 

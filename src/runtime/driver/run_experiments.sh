@@ -14,8 +14,8 @@
 #       Move scheduler results to results folder
 #
 
-BASE_PATH=/home/rudy/wo/gpu
-#BASE_PATH=/home/cc
+#BASE_PATH=/home/rudy/wo/gpu
+BASE_PATH=/home/cc
 BEMPS_SCHED_PATH=${BASE_PATH}/GPU-Sched/build/runtime/sched
 WORKLOADER_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver
 WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/test
@@ -24,10 +24,11 @@ RESULTS_PATH=results
 
 
 WORKLOADS=(
+    all_jobs_0.wl
     #debug_02.wl
     #debug_05.wl
     #debug_06.wl
-    debug_07.wl
+    #debug_07.wl
     #k80_small_16jobs_0.wl
     #k80_small_16jobs_1.wl
     #k80_medium_16jobs_0.wl
@@ -83,9 +84,6 @@ for WORKLOAD in ${WORKLOADS[@]}; do
             SCHED_ARGS=""
             if [ "${SCHED_ALG}" == "cg" ]; then
                 SCHED_ARGS=${ARGS}
-                echo "was cg"
-            else
-                echo "bash blows"
             fi
 
             echo "Launching scheduler for ${EXPERIMENT_BASENAME}"
