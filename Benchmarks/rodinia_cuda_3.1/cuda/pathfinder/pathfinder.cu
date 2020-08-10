@@ -21,6 +21,8 @@ int pyramid_height;
 
 //#define BENCH_PRINT
 
+FILE *fp_out;
+
 
 void
 init(int argc, char** argv)
@@ -33,7 +35,7 @@ init(int argc, char** argv)
 
                 pyramid_height=atoi(argv[3]);
 	}else{
-                printf("Usage: dynproc row_len col_len pyramid_height\n");
+                fprintf(fp_out, "Usage: dynproc row_len col_len pyramid_height\n");
                 exit(0);
         }
 	data = new int[rows*cols];
@@ -74,9 +76,9 @@ init(int argc, char** argv)
     {
         for (int j = 0; j < cols; j++)
         {
-            printf("%d ",wall[i][j]) ;
+            fprintf(fp_out, "%d ",wall[i][j]) ;
         }
-        printf("\n") ;
+        fprintf(fp_out, "\n") ;
     }
 
 #endif
@@ -200,10 +202,14 @@ int calc_path(int *gpuWall, int *gpuResult[2], int rows, int cols, \
 int main(int argc, char** argv)
 {
     int num_devices;
+    fp_out = fopen("gt_pathfinder_result.txt", "w");
     cudaGetDeviceCount(&num_devices);
+
     if (num_devices > 1) cudaSetDevice(DEVICE);
 
     run(argc,argv);
+
+    fclose(fp_out);
 
     return EXIT_SUCCESS;
 }
@@ -217,7 +223,7 @@ void run(int argc, char** argv)
     int smallBlockCol = BLOCK_SIZE-(pyramid_height)*HALO*2;
     int blockCols = cols/smallBlockCol+((cols%smallBlockCol==0)?0:1);
 
-    printf("pyramidHeight: %d\ngridSize: [%d]\nborder:[%d]\nblockSize: %d\nblockGrid:[%d]\ntargetBlock:[%d]\n",\
+    fprintf(fp_out, "pyramidHeight: %d\ngridSize: [%d]\nborder:[%d]\nblockSize: %d\nblockGrid:[%d]\ntargetBlock:[%d]\n",\
 	pyramid_height, cols, borderCols, BLOCK_SIZE, blockCols, smallBlockCol);
 	
     int *gpuWall, *gpuResult[2];
@@ -240,15 +246,15 @@ void run(int argc, char** argv)
 
     for (int i = 0; i < cols; i++)
 
-            printf("%d ",data[i]) ;
+            fprintf(fp_out, "%d ",data[i]) ;
 
-    printf("\n") ;
+    fprintf(fp_out, "\n") ;
 
     for (int i = 0; i < cols; i++)
 
-            printf("%d ",result[i]) ;
+            fprintf(fp_out, "%d ",result[i]) ;
 
-    printf("\n") ;
+    fprintf(fp_out, "\n") ;
 
 #endif
 
