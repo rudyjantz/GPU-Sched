@@ -117,7 +117,9 @@ extern "C" cudaError_t cudaKernelLaunchPrepare(uint64_t gxy, int gz,
     bemps_begin(id, gx, gy, gz, bx, by, bz, membytes);
     R.disableIssue();
   }
-  return R.prepare();
+  cudaError_t err = R.prepare();
+  if (err != cudaSuccess) exit(EXIT_FAILURE);
+  return err;
 }
 
 extern "C" cudaError_t cudaFreeWrapper(void* devPtr) {
@@ -136,6 +138,7 @@ extern "C" cudaError_t cudaFreeWrapper(void* devPtr) {
 }
 
 extern "C" void * lookup(void * addr) {
+  assert(R.isAllocated(addr) && "lookup meet an unallocated addr, it is impossible");
   return R.getValidAddr(addr);
 }
 
