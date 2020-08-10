@@ -1,14 +1,19 @@
 #!/usr/bin/env python3
 import sys
 import statistics
-from scipy.stats.mstats import gmean
+import math
 from pprint import pprint
+
+
+def geomean(xs):
+    return math.exp(math.fsum(math.log(x) for x in xs) / len(xs))
 
 
 
 
 #BASE_PATH = '/home/rudy/wo/gpu/bes-gpu/foo/scripts/cc/results-2020.08.01-7.30pm'
-BASE_PATH = '/home/rudy/wo/gpu/GPU-Sched/src/runtime/driver/results'
+#BASE_PATH = '/home/rudy/wo/gpu/GPU-Sched/src/runtime/driver/results'
+BASE_PATH = '/home/cc/GPU-Sched/src/runtime/driver/results'
 
 SCHED_LOG_SUF  = 'sched-log'
 SCHED_STAT_SUF = 'sched-stats'
@@ -27,7 +32,8 @@ workloads = [
     #'k80_large_16jobs_0',
     #'k80_large_16jobs_1',
     #'k80_large_16jobs_1',
-    'debug_07'
+    #'debug_07'
+    'p100_small_16jobs_3',
 ]
 
 
@@ -151,15 +157,15 @@ def report_total_time_and_throughput(workload):
 
 
 def report_beacon_times(sa_bcn_times, cg_bcn_times, mgb_bcn_times):
-    print('sa beacon times')
+    print('sa-beacon-times')
     for k, v in sa_bcn_times.items():
         print('{} {}'.format(k, v))
     print()
-    print('cg beacon times')
+    print('cg-beacon-times')
     for k, v in cg_bcn_times.items():
         print('{} {}'.format(k, v))
     print()
-    print('mgb beacon times')
+    print('mgb-beacon-times')
     for k, v in mgb_bcn_times.items():
         print('{} {}'.format(k, v))
     print()
@@ -176,13 +182,13 @@ def report_avg_speedup_throughput_improvement_and_job_slowdown():
     avg_cg_throughput_improvement  = statistics.mean(cg_throughput_improvements)
     avg_mgb_throughput_improvement = statistics.mean(mgb_throughput_improvements)
 
-    if avg_cg_throughput_improvement != avg_cg_speedup:
+    if abs(avg_cg_throughput_improvement - avg_cg_speedup) > 0.0000001: # some small but arbitrary value
         print('POSSIBLE ERROR: avg cg throughput improvement and speedup ' \
               'mismatch. This could be due to rounding error, or it could be ' \
               'an actual bug')
         print('  avg_cg_speedup {}'.format(avg_cg_speedup))
         print('  avg_cg_throughput_improvement {}'.format(avg_cg_throughput_improvement))
-    if avg_mgb_throughput_improvement != avg_mgb_speedup:
+    if abs(avg_mgb_throughput_improvement - avg_mgb_speedup) > 0.0000001:
         print('POSSIBLE ERROR: avg cg throughput improvement and speedup ' \
               'mismatch. This could be due to rounding error, or it could be ' \
               'an actual bug')
@@ -195,8 +201,8 @@ def report_avg_speedup_throughput_improvement_and_job_slowdown():
     mgb_job_slowdowns = [ t[0][1] / t[1][1] for t in zip(mgb_job_times, sa_job_times) ]
     avg_cg_job_slowdown      = statistics.mean(cg_job_slowdowns)
     avg_mgb_job_slowdown     = statistics.mean(mgb_job_slowdowns)
-    geomean_cg_job_slowdown  = gmean(cg_job_slowdowns)
-    geomean_mgb_job_slowdown = gmean(mgb_job_slowdowns)
+    geomean_cg_job_slowdown  = geomean(cg_job_slowdowns)
+    geomean_mgb_job_slowdown = geomean(mgb_job_slowdowns)
     print('mean_cg_job_slowdown {}'.format(avg_cg_job_slowdown))
     print('geomean_cg_job_slowdown {}'.format(geomean_cg_job_slowdown))
     print('mean_mgb_job_slowdown {}'.format(avg_mgb_job_slowdown))
@@ -232,9 +238,9 @@ for workload in workloads:
     #sa_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'single-assignment', WRKLDR_LOG_SUF)
     #cg_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'cg', WRKLDR_LOG_SUF)
     #mgb_filename = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'mgb', WRKLDR_LOG_SUF)
-    sa_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'single-assignment.1', WRKLDR_LOG_SUF)
+    sa_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'single-assignment.2', WRKLDR_LOG_SUF)
     cg_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'cg.6', WRKLDR_LOG_SUF)
-    mgb_filename = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'mgb.48.10', WRKLDR_LOG_SUF)
+    mgb_filename = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'mgb.6', WRKLDR_LOG_SUF)
 
     sa_times, sa_total_time, sa_throughput, sa_bcn_times     = parse_workloader_log(sa_filename)
     cg_times, cg_total_time, cg_throughput, cg_bcn_times     = parse_workloader_log(cg_filename)
