@@ -23,9 +23,11 @@
 #define SCHED_MGB_BATCH_SIZE    10
 
 // Based on nvidia-smi
-const long P100_PCIE_TOTAL_MEM_KB = 16280L * 1024;
+//const long P100_PCIE_TOTAL_MEM_KB = 16280L * 1024;
 const long TESLA_K80_TOTAL_MEM_KB = 11441L * 1024;
 const long GTX_1080_TOTAL_MEM_KB = 8116L * 1024;
+
+const long P100_PCIE_TOTAL_MEM_KB = 14000L * 1024;
 
 #if defined(GPU_RES_SLOP)
 #define NUM_GPUS 1
