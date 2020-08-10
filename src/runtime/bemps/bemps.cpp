@@ -347,9 +347,7 @@ void bemps_free(int bemps_tid) {
 }
 }
 
-
-void _send_beacon_at_exit(void)
-{
+void _send_beacon_at_exit(void) {
   int orig_beacon_q_idx;
   int exit_beacon_q_idx;
   bemps_shm_comm_t *comm;
@@ -366,9 +364,7 @@ void _send_beacon_at_exit(void)
   // XXX This should be the last field that we change in the comm structure,
   // because it's used for gating the scheduler and preventing races.
   comm->state = BEMPS_BEACON_STATE_BEACON_FIRED_E;
-
 }
-
 
 int bemps_init(void) {
   int fd;
