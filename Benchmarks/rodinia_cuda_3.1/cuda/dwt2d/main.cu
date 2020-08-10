@@ -58,7 +58,7 @@ int getImg(char * srcFilename, unsigned char *srcImg, int inputSize)
     if((newSrc = (char *)malloc(strlen(srcFilename)+strlen(path)+1)) != NULL)
     {
         newSrc[0] = '\0';
-        strcat(newSrc, path);
+        //strcat(newSrc, path);
         strcat(newSrc, srcFilename);
         srcFilename= newSrc;
     }
