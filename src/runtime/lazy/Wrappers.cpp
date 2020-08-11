@@ -138,7 +138,10 @@ extern "C" cudaError_t cudaFreeWrapper(void* devPtr) {
 }
 
 extern "C" void * lookup(void * addr) {
-  assert(R.isAllocated(addr) && "lookup meet an unallocated addr, it is impossible");
+#if DEBUG
+  printf("\nLookup: %p", addr);
+#endif
+
   return R.getValidAddr(addr);
 }
 
