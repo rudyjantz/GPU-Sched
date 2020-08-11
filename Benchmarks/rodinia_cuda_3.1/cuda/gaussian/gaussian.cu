@@ -45,6 +45,7 @@ float *a, *b, *finalVec;
 float *m;
 
 FILE *fp;
+FILE *fp_out;
 
 void InitProblemOnce(char *filename);
 void InitPerRun();
@@ -91,39 +92,41 @@ create_matrix(float *m, int size){
 
 int main(int argc, char *argv[])
 {
-  printf("WG size of kernel 1 = %d, WG size of kernel 2= %d X %d\n", MAXBLOCKSIZE, BLOCK_SIZE_XY, BLOCK_SIZE_XY);
+    fp_out = fopen("gt_gaussian_result.txt", "w");
+  fprintf(fp_out, "WG size of kernel 1 = %d, WG size of kernel 2= %d X %d\n", MAXBLOCKSIZE, BLOCK_SIZE_XY, BLOCK_SIZE_XY);
     int verbose = 1;
     int i, j;
     char flag;
     if (argc < 2) {
-        printf("Usage: gaussian -f filename / -s size [-q]\n\n");
-        printf("-q (quiet) suppresses printing the matrix and result values.\n");
-        printf("-f (filename) path of input file\n");
-        printf("-s (size) size of matrix. Create matrix and rhs in this program \n");
-        printf("The first line of the file contains the dimension of the matrix, n.");
-        printf("The second line of the file is a newline.\n");
-        printf("The next n lines contain n tab separated values for the matrix.");
-        printf("The next line of the file is a newline.\n");
-        printf("The next line of the file is a 1xn vector with tab separated values.\n");
-        printf("The next line of the file is a newline. (optional)\n");
-        printf("The final line of the file is the pre-computed solution. (optional)\n");
-        printf("Example: matrix4.txt:\n");
-        printf("4\n");
-        printf("\n");
-        printf("-0.6	-0.5	0.7	0.3\n");
-        printf("-0.3	-0.9	0.3	0.7\n");
-        printf("-0.4	-0.5	-0.3	-0.8\n");	
-        printf("0.0	-0.1	0.2	0.9\n");
-        printf("\n");
-        printf("-0.85	-0.68	0.24	-0.53\n");	
-        printf("\n");
-        printf("0.7	0.0	-0.4	-0.5\n");
+        fprintf(fp_out, "Usage: gaussian -f filename / -s size [-q]\n\n");
+        fprintf(fp_out, "-q (quiet) suppresses printing the matrix and result values.\n");
+        fprintf(fp_out, "-f (filename) path of input file\n");
+        fprintf(fp_out, "-s (size) size of matrix. Create matrix and rhs in this program \n");
+        fprintf(fp_out, "The first line of the file contains the dimension of the matrix, n.");
+        fprintf(fp_out, "The second line of the file is a newline.\n");
+        fprintf(fp_out, "The next n lines contain n tab separated values for the matrix.");
+        fprintf(fp_out, "The next line of the file is a newline.\n");
+        fprintf(fp_out, "The next line of the file is a 1xn vector with tab separated values.\n");
+        fprintf(fp_out, "The next line of the file is a newline. (optional)\n");
+        fprintf(fp_out, "The final line of the file is the pre-computed solution. (optional)\n");
+        fprintf(fp_out, "Example: matrix4.txt:\n");
+        fprintf(fp_out, "4\n");
+        fprintf(fp_out, "\n");
+        fprintf(fp_out, "-0.6	-0.5	0.7	0.3\n");
+        fprintf(fp_out, "-0.3	-0.9	0.3	0.7\n");
+        fprintf(fp_out, "-0.4	-0.5	-0.3	-0.8\n");	
+        fprintf(fp_out, "0.0	-0.1	0.2	0.9\n");
+        fprintf(fp_out, "\n");
+        fprintf(fp_out, "-0.85	-0.68	0.24	-0.53\n");	
+        fprintf(fp_out, "\n");
+        fprintf(fp_out, "0.7	0.0	-0.4	-0.5\n");
+        fclose(fp_out);
         exit(0);
     }
     
     //PrintDeviceProperties();
     //char filename[100];
-    //sprintf(filename,"matrices/matrix%d.txt",size);
+    //sfprintf(fp_out, filename,"matrices/matrix%d.txt",size);
 
     for(i=1;i<argc;i++) {
       if (argv[i][0]=='-') {// flag
@@ -132,7 +135,7 @@ int main(int argc, char *argv[])
             case 's': // platform
               i++;
               Size = atoi(argv[i]);
-	      printf("Create matrix internally in parse, size = %d \n", Size);
+	      fprintf(fp_out, "Create matrix internally in parse, size = %d \n", Size);
 
 	      a = (float *) malloc(Size * Size * sizeof(float));
 	      create_matrix(a, Size);
@@ -145,7 +148,7 @@ int main(int argc, char *argv[])
               break;
             case 'f': // platform
               i++;
-	      printf("Read file from %s \n", argv[i]);
+	      fprintf(fp_out, "Read file from %s \n", argv[i]);
 	      InitProblemOnce(argv[i]);
               break;
             case 'q': // quiet
@@ -170,29 +173,30 @@ int main(int argc, char *argv[])
     unsigned int time_total = (time_end.tv_sec * 1000000 + time_end.tv_usec) - (time_start.tv_sec * 1000000 + time_start.tv_usec);
     
     if (verbose) {
-        printf("Matrix m is: \n");
+        fprintf(fp_out, "Matrix m is: \n");
         PrintMat(m, Size, Size);
 
-        printf("Matrix a is: \n");
+        fprintf(fp_out, "Matrix a is: \n");
         PrintMat(a, Size, Size);
 
-        printf("Array b is: \n");
+        fprintf(fp_out, "Array b is: \n");
         PrintAry(b, Size);
     }
     BackSub();
     if (verbose) {
-        printf("The final solution is: \n");
+        fprintf(fp_out, "The final solution is: \n");
         PrintAry(finalVec,Size);
     }
-    printf("\nTime total (including memory transfers)\t%f sec\n", time_total * 1e-6);
-    printf("Time for CUDA kernels:\t%f sec\n",totalKernelTime * 1e-6);
+    fprintf(fp_out, "\nTime total (including memory transfers)\t%f sec\n", time_total * 1e-6);
+    fprintf(fp_out, "Time for CUDA kernels:\t%f sec\n",totalKernelTime * 1e-6);
     
-    /*printf("%d,%d\n",size,time_total);
+    /*fprintf(fp_out, "%d,%d\n",size,time_total);
     fprintf(stderr,"%d,%d\n",size,time_total);*/
     
     free(m);
     free(a);
     free(b);
+    fclose(fp_out);
 }
 /*------------------------------------------------------
  ** PrintDeviceProperties
@@ -203,31 +207,31 @@ void PrintDeviceProperties(){
 	int nDevCount = 0;  
 	
 	cudaGetDeviceCount( &nDevCount );  
-	printf( "Total Device found: %d", nDevCount );  
+	fprintf(fp_out,  "Total Device found: %d", nDevCount );  
 	for (int nDeviceIdx = 0; nDeviceIdx < nDevCount; ++nDeviceIdx )  
 	{  
 	    memset( &deviceProp, 0, sizeof(deviceProp));  
 	    if( cudaSuccess == cudaGetDeviceProperties(&deviceProp, nDeviceIdx))  
 	        {
-				printf( "\nDevice Name \t\t - %s ", deviceProp.name );  
-			    printf( "\n**************************************");  
-			    printf( "\nTotal Global Memory\t\t\t - %lu KB", deviceProp.totalGlobalMem/1024 );  
-			    printf( "\nShared memory available per block \t - %lu KB", deviceProp.sharedMemPerBlock/1024 );  
-			    printf( "\nNumber of registers per thread block \t - %d", deviceProp.regsPerBlock );  
-			    printf( "\nWarp size in threads \t\t\t - %d", deviceProp.warpSize );  
-			    printf( "\nMemory Pitch \t\t\t\t - %zu bytes", deviceProp.memPitch );  
-			    printf( "\nMaximum threads per block \t\t - %d", deviceProp.maxThreadsPerBlock );  
-			    printf( "\nMaximum Thread Dimension (block) \t - %d %d %d", deviceProp.maxThreadsDim[0], deviceProp.maxThreadsDim[1], deviceProp.maxThreadsDim[2] );  
-			    printf( "\nMaximum Thread Dimension (grid) \t - %d %d %d", deviceProp.maxGridSize[0], deviceProp.maxGridSize[1], deviceProp.maxGridSize[2] );  
-			    printf( "\nTotal constant memory \t\t\t - %zu bytes", deviceProp.totalConstMem );  
-			    printf( "\nCUDA ver \t\t\t\t - %d.%d", deviceProp.major, deviceProp.minor );  
-			    printf( "\nClock rate \t\t\t\t - %d KHz", deviceProp.clockRate );  
-			    printf( "\nTexture Alignment \t\t\t - %zu bytes", deviceProp.textureAlignment );  
-			    printf( "\nDevice Overlap \t\t\t\t - %s", deviceProp. deviceOverlap?"Allowed":"Not Allowed" );  
-			    printf( "\nNumber of Multi processors \t\t - %d\n\n", deviceProp.multiProcessorCount );  
+				fprintf(fp_out,  "\nDevice Name \t\t - %s ", deviceProp.name );  
+			    fprintf(fp_out,  "\n**************************************");  
+			    fprintf(fp_out,  "\nTotal Global Memory\t\t\t - %lu KB", deviceProp.totalGlobalMem/1024 );  
+			    fprintf(fp_out,  "\nShared memory available per block \t - %lu KB", deviceProp.sharedMemPerBlock/1024 );  
+			    fprintf(fp_out,  "\nNumber of registers per thread block \t - %d", deviceProp.regsPerBlock );  
+			    fprintf(fp_out,  "\nWarp size in threads \t\t\t - %d", deviceProp.warpSize );  
+			    fprintf(fp_out,  "\nMemory Pitch \t\t\t\t - %zu bytes", deviceProp.memPitch );  
+			    fprintf(fp_out,  "\nMaximum threads per block \t\t - %d", deviceProp.maxThreadsPerBlock );  
+			    fprintf(fp_out,  "\nMaximum Thread Dimension (block) \t - %d %d %d", deviceProp.maxThreadsDim[0], deviceProp.maxThreadsDim[1], deviceProp.maxThreadsDim[2] );  
+			    fprintf(fp_out,  "\nMaximum Thread Dimension (grid) \t - %d %d %d", deviceProp.maxGridSize[0], deviceProp.maxGridSize[1], deviceProp.maxGridSize[2] );  
+			    fprintf(fp_out,  "\nTotal constant memory \t\t\t - %zu bytes", deviceProp.totalConstMem );  
+			    fprintf(fp_out,  "\nCUDA ver \t\t\t\t - %d.%d", deviceProp.major, deviceProp.minor );  
+			    fprintf(fp_out,  "\nClock rate \t\t\t\t - %d KHz", deviceProp.clockRate );  
+			    fprintf(fp_out,  "\nTexture Alignment \t\t\t - %zu bytes", deviceProp.textureAlignment );  
+			    fprintf(fp_out,  "\nDevice Overlap \t\t\t\t - %s", deviceProp. deviceOverlap?"Allowed":"Not Allowed" );  
+			    fprintf(fp_out,  "\nNumber of Multi processors \t\t - %d\n\n", deviceProp.multiProcessorCount );  
 			}  
 	    else  
-	        printf( "\n%s", cudaGetErrorString(cudaGetLastError()));  
+	        fprintf(fp_out,  "\n%s", cudaGetErrorString(cudaGetLastError()));  
 	}  
 }
  
@@ -244,9 +248,9 @@ void InitProblemOnce(char *filename)
 {
 	//char *filename = argv[1];
 	
-	//printf("Enter the data file name: ");
+	//fprintf(fp_out, "Enter the data file name: ");
 	//scanf("%s", filename);
-	//printf("The file name is: %s\n", filename);
+	//fprintf(fp_out, "The file name is: %s\n", filename);
 	
 	fp = fopen(filename, "r");
 	
@@ -255,12 +259,12 @@ void InitProblemOnce(char *filename)
 	a = (float *) malloc(Size * Size * sizeof(float));
 	 
 	InitMat(a, Size, Size);
-	//printf("The input matrix a is:\n");
+	//fprintf(fp_out, "The input matrix a is:\n");
 	//PrintMat(a, Size, Size);
 	b = (float *) malloc(Size * sizeof(float));
 	
 	InitAry(b, Size);
-	//printf("The input array b is:\n");
+	//fprintf(fp_out, "The input array b is:\n");
 	//PrintAry(b, Size);
 		
 	 m = (float *) malloc(Size * Size * sizeof(float));
@@ -288,8 +292,8 @@ void InitPerRun()
  */
 __global__ void Fan1(float *m_cuda, float *a_cuda, int Size, int t)
 {   
-	//if(threadIdx.x + blockIdx.x * blockDim.x >= Size-1-t) printf(".");
-	//printf("blockIDx.x:%d,threadIdx.x:%d,Size:%d,t:%d,Size-1-t:%d\n",blockIdx.x,threadIdx.x,Size,t,Size-1-t);
+	//if(threadIdx.x + blockIdx.x * blockDim.x >= Size-1-t) fprintf(fp_out, ".");
+	//fprintf(fp_out, "blockIDx.x:%d,threadIdx.x:%d,Size:%d,t:%d,Size-1-t:%d\n",blockIdx.x,threadIdx.x,Size,t,Size-1-t);
 
 	if(threadIdx.x + blockIdx.x * blockDim.x >= Size-1-t) return;
 	*(m_cuda+Size*(blockDim.x*blockIdx.x+threadIdx.x+t+1)+t) = *(a_cuda+Size*(blockDim.x*blockIdx.x+threadIdx.x+t+1)+t) / *(a_cuda+Size*t+t);
@@ -307,13 +311,13 @@ __global__ void Fan2(float *m_cuda, float *a_cuda, float *b_cuda,int Size, int j
 	
 	int xidx = blockIdx.x * blockDim.x + threadIdx.x;
 	int yidx = blockIdx.y * blockDim.y + threadIdx.y;
-	//printf("blockIdx.x:%d,threadIdx.x:%d,blockIdx.y:%d,threadIdx.y:%d,blockDim.x:%d,blockDim.y:%d\n",blockIdx.x,threadIdx.x,blockIdx.y,threadIdx.y,blockDim.x,blockDim.y);
+	//fprintf(fp_out, "blockIdx.x:%d,threadIdx.x:%d,blockIdx.y:%d,threadIdx.y:%d,blockDim.x:%d,blockDim.y:%d\n",blockIdx.x,threadIdx.x,blockIdx.y,threadIdx.y,blockDim.x,blockDim.y);
 	
 	a_cuda[Size*(xidx+1+t)+(yidx+t)] -= m_cuda[Size*(xidx+1+t)+t] * a_cuda[Size*t+(yidx+t)];
 	//a_cuda[xidx+1+t][yidx+t] -= m_cuda[xidx+1+t][t] * a_cuda[t][yidx+t];
 	if(yidx == 0){
-		//printf("blockIdx.x:%d,threadIdx.x:%d,blockIdx.y:%d,threadIdx.y:%d,blockDim.x:%d,blockDim.y:%d\n",blockIdx.x,threadIdx.x,blockIdx.y,threadIdx.y,blockDim.x,blockDim.y);
-		//printf("xidx:%d,yidx:%d\n",xidx,yidx);
+		//fprintf(fp_out, "blockIdx.x:%d,threadIdx.x:%d,blockIdx.y:%d,threadIdx.y:%d,blockDim.x:%d,blockDim.y:%d\n",blockIdx.x,threadIdx.x,blockIdx.y,threadIdx.y,blockDim.x,blockDim.y);
+		//fprintf(fp_out, "xidx:%d,yidx:%d\n",xidx,yidx);
 		b_cuda[xidx+1+t] -= m_cuda[Size*(xidx+1+t)+(yidx+t)] * b_cuda[t];
 	}
 }
@@ -331,7 +335,7 @@ void ForwardSub()
 	int block_size,grid_size;
 	block_size = MAXBLOCKSIZE;
 	grid_size = (Size/block_size) + (!(Size%block_size)? 0:1);
-	//printf("1d grid size: %d\n",grid_size);
+	//fprintf(fp_out, "1d grid size: %d\n",grid_size);
 
 	dim3 dimBlock(block_size);
 	dim3 dimGrid(grid_size);
@@ -422,11 +426,11 @@ void PrintMat(float *ary, int nrow, int ncol)
 	
 	for (i=0; i<nrow; i++) {
 		for (j=0; j<ncol; j++) {
-			printf("%8.2f ", *(ary+Size*i+j));
+			fprintf(fp_out, "%8.2f ", *(ary+Size*i+j));
 		}
-		printf("\n");
+		fprintf(fp_out, "\n");
 	}
-	printf("\n");
+	fprintf(fp_out, "\n");
 }
 
 /*------------------------------------------------------
@@ -451,9 +455,9 @@ void PrintAry(float *ary, int ary_size)
 {
 	int i;
 	for (i=0; i<ary_size; i++) {
-		printf("%.2f ", ary[i]);
+		fprintf(fp_out, "%.2f ", ary[i]);
 	}
-	printf("\n\n");
+	fprintf(fp_out, "\n\n");
 }
 void checkCUDAError(const char *msg)
 {
@@ -462,6 +466,7 @@ void checkCUDAError(const char *msg)
     {
         fprintf(stderr, "Cuda error: %s: %s.\n", msg, 
                                   cudaGetErrorString( err) );
+        fclose(fp_out);
         exit(EXIT_FAILURE);
     }                         
 }
