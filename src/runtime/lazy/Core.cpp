@@ -14,13 +14,16 @@ bool Runtime::isAllocated(void* ptr) {
 }
 
 void* Runtime::getValidAddrforFakeAddr(void* ptr) {
-  assert(isAllocated(ptr));
+  assert(isAllocated(ptr) && "meet an unallocated addr");
   uint64_t fake_addr = (uint64_t)ptr;
   return (void*)AllocatedMap[fake_addr];
 }
 
 void* Runtime::getValidAddr(void* ptr) {
-  if (is_fake_addr(ptr)) return getValidAddrforFakeAddr(ptr);
+  if (is_fake_addr(ptr)) {
+    assert(isAllocated(ptr) && "lookup meet an unallocated addr, it is impossible");
+    return getValidAddrforFakeAddr(ptr);
+  }
   return ptr;
 }
 
