@@ -38,9 +38,13 @@ WORKLOADS=(
     ##random_00.wl
     ##random_01.wl
     #p100_small_16jobs_3.wl
-    p100_medium_16jobs_3.wl
+    #p100_medium_16jobs_3.wl
     #p100_large_16jobs_3.wl
     #p100_random_16jobs_3.wl
+    #p100_small_16jobs_4.wl  # sa.2, cg.6, mgb.24.10
+    #p100_medium_16jobs_4.wl # sa.2, cg.4, mgb.16
+    #p100_large_16jobs_4.wl # sa.2, cg.3, mgb.8
+    p100_large_16jobs_5.wl # sa.2, cg.3, mgb.8
 )
 
 SINGLE_ASSIGNMENT_ARGS_ARR=(
@@ -56,10 +60,10 @@ CG_ARGS_ARR=(
 )
 MGB_ARGS_ARR=(
     #6
-    #8
+    8
     #10
     #12
-    16
+    #16
     #24
     #24.10 # num procs . max jobs waiting for GPU
     #48.10 # num procs . max jobs waiting for GPU
