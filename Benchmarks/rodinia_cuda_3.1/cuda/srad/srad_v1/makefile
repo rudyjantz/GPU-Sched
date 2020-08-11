@@ -5,7 +5,7 @@ BEMPS_PASS = $(BEMPS_BUILD_DIR)/passes/analysis/libGPUBeaconPass.so
 
 NVCC := $(CUDA_DIR)/bin/nvcc
 CC := clang
-FLAGS := -O1 -Xclang -load -Xclang $(BEMPS_PASS) 
+FLAGS := -g -O1 -Xclang -load -Xclang $(BEMPS_PASS) 
 
 INCLUDE := $(CUDA_DIR)/include
 

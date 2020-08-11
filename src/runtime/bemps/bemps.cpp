@@ -406,9 +406,7 @@ void bemps_free(int bemps_tid) {
 }
 }
 
-
-void _send_beacon_at_exit(void)
-{
+void _send_beacon_at_exit(void) {
   int orig_beacon_q_idx;
   int exit_beacon_q_idx;
   bemps_shm_comm_t *comm;
@@ -427,9 +425,7 @@ void _send_beacon_at_exit(void)
   comm->state = BEMPS_BEACON_STATE_BEACON_FIRED_E;
 
   _bemps_dump_stats();
-
 }
-
 
 int bemps_init(void) {
   int fd;
