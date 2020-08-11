@@ -71,7 +71,7 @@ all_jobs = [
     ( 2080374784, 'dwt2d/dwt2d {}/dwt2d/rgb.bmp -d 8192x8192 -f -5 -l 3'.format(RODINIA_DATA_PATH)),
     ( 2147745800, 'nw/needle 16384 10'),
     ( 2350907668, 'backprop/backprop 16777216'),
-    ( 3686640000, 'myocyte/myocyte.out 10000 1000 1'),
+    #( 3686640000, 'myocyte/myocyte.out 10000 1000 1'),
     ( 3872176000, 'srad/srad_v1/srad 100 0.5 11000 11000'),
     ( 4699717908, 'backprop/backprop 33554432'),
     ( 6442450944, 'srad/srad_v2/srad 16384 16384 0 127 0 127 0.5 2'),
