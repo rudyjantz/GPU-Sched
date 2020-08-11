@@ -27,6 +27,7 @@ all_jobs = [
                  'command {}/b+tree/command.txt'.format(RODINIA_DATA_PATH,
                                                         RODINIA_DATA_PATH)),
     (  32505856, 'dwt2d/dwt2d {}/dwt2d/rgb.bmp -d 1024x1024 -f -5 -l 3'.format(RODINIA_DATA_PATH)),
+    (  33562624, 'gaussian/gaussian -s 2048'),
     (  33587208, 'nw/needle 2048 10'),
     (  37464000, 'myocyte/myocyte.out 1000 100 1'),
     (  38999881, 'bfs/bfs {}/bfs/graph1MW_6.txt'.format(RODINIA_DATA_PATH)),
@@ -44,6 +45,7 @@ all_jobs = [
     ( 100663296, 'srad/srad_v2/srad 2048 2048 0 127 0 127 0.5 2'),
     ( 104893352, 'particlefilter/particlefilter_float -x 1024 -y 1024 -z 100 -np 100'),
     ( 130023424, 'dwt2d/dwt2d {}/dwt2d/rgb.bmp -d 2048x2048 -f -5 -l 3'.format(RODINIA_DATA_PATH)),
+    ( 134234112, 'gaussian/gaussian -s 4096'),
     ( 134283272, 'nw/needle 4096 10'),
     ( 210834320, 'b+tree/b+tree.out file {}/b+tree/mil_gt.txt command ' \
                  '{}/b+tree/command_gt.txt'.format(RODINIA_DATA_PATH,
