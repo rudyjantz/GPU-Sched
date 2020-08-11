@@ -72,12 +72,18 @@ all_jobs = [
     (2147745800, 'nw/needle 16384 10'),
     (2350907668, 'backprop/backprop 16777216'),
     (3686640000, 'myocyte/myocyte.out 10000 1000 1'),
+    (3872176000, 'srad/srad_v1/srad 100 0.5 11000 11000'),
     (4699717908, 'backprop/backprop 33554432'),
     (6442450944, 'srad/srad_v2/srad 16384 16384 0 127 0 127 0.5 2'),
+    (7200240000, 'srad/srad_v1/srad 100 0.5 15000 15000'),
     (7856000000, 'lavaMD/lavaMD -boxes1d 100'),
     (8321499136, 'dwt2d/dwt2d {}/dwt2d/rgb.bmp -d 16384x16384 -f -5 -l 3'.format(RODINIA_DATA_PATH)),
     (8590458888, 'nw/needle 32768 10'),
     (9397338388, 'backprop/backprop 67108864'),
+	# ~ 10 GB
+    (10456336000, 'lavaMD/lavaMD -boxes1d 110'),
+    (12800320000, 'srad/srad_v1/srad 100 0.5 20000 20000'),
+    (13575168000, 'lavaMD/lavaMD -boxes1d 120'),
     #(25769803776, 'srad/srad_v2/srad 32768 32768 0 127 0 127 0.5 2'), # seems halved to 12GB
 ]
 small_jobs = []
