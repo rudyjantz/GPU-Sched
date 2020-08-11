@@ -319,13 +319,20 @@ void bemps_beacon(int bemps_tid, bemps_beacon_t *beacon) {
 extern "C" {
 void bemps_begin(int id, int gx, int gy, int gz, int bx, int by, int bz,
                  int64_t membytes) {
+  int num_blocks;
+  int threads_per_block;
+  int warps;
 
   bemps_stopwatch_start(&bemps_stopwatches[BEMPS_STOPWATCH_BEACON]);
   if (!beacon_initialized) {
     beacon_initialized = !bemps_init();
   }
 
-  int warps = gx * gy * gz * bx * by * bz / 32;
+  num_blocks        = gx * gy * gz;
+  threads_per_block = bx * by * bz;
+  BEMPS_LOG("num_blocks " << num_blocks << " , "
+         << "threads_per_block " << threads_per_block << "\n");
+  warps = num_blocks * threads_per_block / 32;
   bemps_beacon_t beacon;
   beacon.cores = warps;
   beacon.mem_B = membytes;
