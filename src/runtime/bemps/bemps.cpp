@@ -31,6 +31,19 @@
   } while (0)
 #endif
 
+#ifdef BEMPS_STATS
+#define BEMPS_STATS_LOG(str)    \
+  do {                          \
+    std::cout << _get_time_ns() << " " << __FUNCTION__ << ": " << str; \
+    std::cout.flush();                                                 \
+  } while (0)
+#else
+#define BEMPS_STATS_LOG(str) \
+  do {                 \
+  } while (0)
+#endif
+
+
 #define ABS(x) (((x) ^ ((x) >> 31)) - ((x) >> 31))
 
 #define BEMPS_NUM_STOPWATCHES 2
@@ -67,29 +80,28 @@ static inline long long _get_time_ns(void) {
 }
 
 void _bemps_dump_stats(void) {
-#ifdef BEMPS_TIMING
   bemps_stopwatch_t *sb;
   bemps_stopwatch_t *sf;
   sb = &bemps_stopwatches[BEMPS_STOPWATCH_BEACON];
   sf = &bemps_stopwatches[BEMPS_STOPWATCH_FREE];
-  BEMPS_LOG("Dumping bemps stats\n");
-  BEMPS_LOG("count of beacon times: " << sb->n << "\n");
-  BEMPS_LOG("min beacon time (ns): " << sb->min << "\n");
-  BEMPS_LOG("max beacon time (ns): " << sb->max << "\n");
-  BEMPS_LOG("avg beacon time (ns): " << sb->avg << "\n");
-  BEMPS_LOG("count of free times: " << sf->n << "\n");
-  BEMPS_LOG("min free time (ns): " << sf->min << "\n");
-  BEMPS_LOG("max free time (ns): " << sf->max << "\n");
-  BEMPS_LOG("avg free time (ns): " << sf->avg << "\n");
-#endif
+  BEMPS_STATS_LOG("Dumping bemps stats\n");
+  BEMPS_STATS_LOG("count of beacon times: " << sb->n << "\n");
+  BEMPS_STATS_LOG("min beacon time (ns): " << sb->min << "\n");
+  BEMPS_STATS_LOG("max beacon time (ns): " << sb->max << "\n");
+  BEMPS_STATS_LOG("avg beacon time (ns): " << sb->avg << "\n");
+  BEMPS_STATS_LOG("count of free times: " << sf->n << "\n");
+  BEMPS_STATS_LOG("min free time (ns): " << sf->min << "\n");
+  BEMPS_STATS_LOG("max free time (ns): " << sf->max << "\n");
+  BEMPS_STATS_LOG("avg free time (ns): " << sf->avg << "\n");
 }
+
 void bemps_stopwatch_start(bemps_stopwatch_t *s) {
-#ifdef BEMPS_TIMING
+#ifdef BEMPS_STATS
   s->ts = _get_time_ns();
 #endif
 }
 void bemps_stopwatch_end(bemps_stopwatch_t *s) {
-#ifdef BEMPS_TIMING
+#ifdef BEMPS_STATS
   long long diff;
   ++(s->n);
   diff = _get_time_ns() - s->ts;
@@ -299,10 +311,9 @@ void bemps_beacon(int bemps_tid, bemps_beacon_t *beacon) {
   int q_idx;
   bemps_shm_comm_t *comm;
 
-  BEMPS_LOG("bemps_beacon:"
-            << " bemps_tid(" << bemps_tid << ")"
-            << " mem_B(" << beacon->mem_B << ")"
-            << " cores(" << beacon->cores << ")\n");
+  BEMPS_STATS_LOG("bemps_tid(" << bemps_tid << ")"
+               << " mem_B(" << beacon->mem_B << ")"
+               << " cores(" << beacon->cores << ")\n");
 
   q_idx = _push_beacon(beacon);
   bemps_tid_to_q_idx[bemps_tid] = q_idx;
@@ -330,8 +341,8 @@ void bemps_begin(int id, int gx, int gy, int gz, int bx, int by, int bz,
 
   num_blocks        = gx * gy * gz;
   threads_per_block = bx * by * bz;
-  BEMPS_LOG("num_blocks " << num_blocks << " , "
-         << "threads_per_block " << threads_per_block << "\n");
+  BEMPS_STATS_LOG("num_blocks " << num_blocks << " , "
+               << "threads_per_block " << threads_per_block << "\n");
   warps = num_blocks * threads_per_block / 32;
   bemps_beacon_t beacon;
   beacon.cores = warps;

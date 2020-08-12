@@ -256,7 +256,8 @@ void dump_stats(void) {
   STATS_LOG("max_age: " << stats.max_age << "\n");
   STATS_LOG("max_batch_size: " << max_batch_size << "\n");
   STATS_LOG("max_observed_batch_size: "<<stats.max_observed_batch_size<< "\n");
-#ifdef BEMPS_TIMING
+// clockwatch is only active if BEMPS_STATS is defined
+#ifdef BEMPS_STATS
   STATS_LOG("count-of-awake-times: " << sa->n << "\n");
   STATS_LOG("min-awake-time-(ns): " << sa->min << "\n");
   STATS_LOG("max-awake-time-(ns): " << sa->max << "\n");
@@ -376,7 +377,7 @@ void sched_mgb(void) {
         } else {
           stats.num_beacons++;
           boomers.push_back(comm);
-          batch_size++;
+          batch_size++; // batch size doesn't include free() beacons
           ++*jobs_waiting_on_gpu;
         }
       }
@@ -416,7 +417,9 @@ void sched_mgb(void) {
         BEMPS_SCHED_LOG("Checking device " << tmp_dev_id << "\n"
                         << "  Total avail bytes: " << GPU_RES[tmp_dev_id].mem_B << "\n"
                         << "  In-use bytes: " << gpu_res_in_use[tmp_dev_id].mem_B << "\n"
-                        << "  Trying-to-fit bytes: " << comm->beacon.mem_B << "\n");
+                        << "  Trying-to-fit bytes: " << comm->beacon.mem_B << "\n"
+                        << "  In-use cores: " << gpu_res_in_use[tmp_dev_id].cores << "\n"
+                        << "  Trying-to-add cores: " << comm->beacon.cores << "\n");
         if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
              GPU_RES[tmp_dev_id].mem_B)) {
           if (gpu_res_in_use[tmp_dev_id].cores < curr_min_cores) {
