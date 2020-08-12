@@ -311,9 +311,10 @@ void bemps_beacon(int bemps_tid, bemps_beacon_t *beacon) {
   int q_idx;
   bemps_shm_comm_t *comm;
 
-  BEMPS_STATS_LOG("bemps_tid(" << bemps_tid << ")"
-               << " mem_B(" << beacon->mem_B << ")"
-               << " cores(" << beacon->cores << ")\n");
+  BEMPS_STATS_LOG("pid " << pid << " , "
+               << "bemps_tid " << bemps_tid << " , "
+               << "mem_B " << beacon->mem_B << " , "
+               << "cores " << beacon->cores << "\n");
 
   q_idx = _push_beacon(beacon);
   bemps_tid_to_q_idx[bemps_tid] = q_idx;
@@ -341,7 +342,8 @@ void bemps_begin(int id, int gx, int gy, int gz, int bx, int by, int bz,
 
   num_blocks        = gx * gy * gz;
   threads_per_block = bx * by * bz;
-  BEMPS_STATS_LOG("num_blocks " << num_blocks << " , "
+  BEMPS_STATS_LOG("pid " << pid << " , "
+               << "num_blocks " << num_blocks << " , "
                << "threads_per_block " << threads_per_block << "\n");
   warps = (num_blocks * threads_per_block + 32) / 32;
   bemps_beacon_t beacon;
@@ -390,10 +392,9 @@ void bemps_free(int bemps_tid) {
   bemps_tid_to_q_idx.erase(bemps_tid);
   _reset_comm(comm);
 
-  BEMPS_LOG("pid(" << pid << ") "
-                   << "freeing device_id(" << device_id << ") "
-                   << "for bemps_tid(" << bemps_tid << ")"
-                   << "\n");
+  BEMPS_LOG("pid " << pid << " , "
+          << "freeing device_id " << device_id << " , "
+          << "bemps_tid " << bemps_tid << "\n");
 
   //
   // Notify the scheduler of the resources that have freed up.
