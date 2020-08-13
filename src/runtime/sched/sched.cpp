@@ -16,7 +16,7 @@
 
 #include "bemps.hpp"
 
-//#define BEMPS_SCHED_DEBUG
+#define BEMPS_SCHED_DEBUG
 
 #define SCHED_DEFAULT_BATCH_SIZE 1
 #define SCHED_VECTOR_BATCH_SIZE 10
@@ -28,6 +28,7 @@ const long TESLA_K80_TOTAL_MEM_KB = 11441L * 1024;
 const long GTX_1080_TOTAL_MEM_KB = 8116L * 1024;
 
 const long P100_PCIE_TOTAL_MEM_KB = 14000L * 1024;
+const long V100_SXM2_TOTAL_MEM_KB = 14000L * 1024;
 
 #if defined(GPU_RES_SLOP)
 #define NUM_GPUS 1
@@ -72,6 +73,20 @@ const long P100_PCIE_TOTAL_MEM_KB = 14000L * 1024;
   GPU_RES[3].cores = 2500;                                                 \
   memset(gpu_res_in_use, 0, sizeof(gpu_res_in_use));                       \
   dump_gpu_res("cc_4");
+
+#elif defined(GPU_RES_AWS_4)
+#define NUM_GPUS 4
+#define INIT_GPU_RES()                                                     \
+  GPU_RES[0].mem_B = V100_SXM2_TOTAL_MEM_KB * 1024;                        \
+  GPU_RES[0].cores = 5120;                                                 \
+  GPU_RES[1].mem_B = V100_SXM2_TOTAL_MEM_KB * 1024;                        \
+  GPU_RES[1].cores = 5120;                                                 \
+  GPU_RES[2].mem_B = V100_SXM2_TOTAL_MEM_KB * 1024;                        \
+  GPU_RES[2].cores = 5120;                                                 \
+  GPU_RES[3].mem_B = V100_SXM2_TOTAL_MEM_KB * 1024;                        \
+  GPU_RES[3].cores = 5120;                                                 \
+  memset(gpu_res_in_use, 0, sizeof(gpu_res_in_use));                       \
+  dump_gpu_res("aws_4");
 
 #else
 #define NUM_GPUS 0
