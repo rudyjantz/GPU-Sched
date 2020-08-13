@@ -1034,6 +1034,7 @@ void sched(void) {
 
 void parse_args(int argc, char **argv) {
   int i;
+  int num_workers;
 
   max_batch_size = SCHED_DEFAULT_BATCH_SIZE;
 
@@ -1067,7 +1068,11 @@ void parse_args(int argc, char **argv) {
             usage_and_exit(argv[0]);
         }
     }
-    CG_JOBS_PER_GPU = atoi(argv[2]);
+    num_workers = atoi(argv[2]);
+    CG_JOBS_PER_GPU = num_workers / NUM_GPUS;
+    if (num_workers % NUM_GPUS) {
+        CG_JOBS_PER_GPU++;
+    }
   } else if (strncmp(argv[1], "mgb", 4) == 0) {
     which_scheduler = SCHED_ALG_MGB_E;
     max_batch_size = SCHED_MGB_BATCH_SIZE;
