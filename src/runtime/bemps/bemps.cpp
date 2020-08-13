@@ -17,7 +17,7 @@
 
 #include "bemps.hpp"
 
-#define BEMPS_DEBUG
+//#define BEMPS_DEBUG
 
 #ifdef BEMPS_DEBUG
 #define BEMPS_LOG(str)                                                 \
