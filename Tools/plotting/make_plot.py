@@ -56,8 +56,11 @@ def drawSideBars(x_var, y_multiVar, y_varLegends, ImgOutName, Title, Ylabel):
     #ax.set_title(Title, fontsize=title_fontsize)
     ax.set_xticks(index + width)
     ax.set_xticklabels(x_var, fontsize=xtick_fontsize)
-    ax.set_xlim(-width)
-    ax.set_ylim([0,4])
+
+    #ax.set_xlim(-width)
+    ax.set_xlim([-0.2,9])
+
+    ax.set_ylim([0.8,3])
     #ax.set_ylim([0,10])
 
 
@@ -95,8 +98,8 @@ def drawSideBars(x_var, y_multiVar, y_varLegends, ImgOutName, Title, Ylabel):
     ax.yaxis.grid(color='gray', linestyle='dashed')
     ax.xaxis.grid(color='gray', linestyle='dashed')
     #legends
-    #ax.legend(rects, y_varLegends, loc=(0.7,0.75), fontsize=legend_fontsize)
-    ax.legend(rects, y_varLegends, fontsize=legend_fontsize)
+    ax.legend(rects, y_varLegends, loc=(0.8,0.75), fontsize=legend_fontsize)
+    #ax.legend(rects, y_varLegends, fontsize=legend_fontsize)
 
     plt.xticks(rotation=-45)
     plt.yticks(fontsize=ytick_fontsize)
