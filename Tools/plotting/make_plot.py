@@ -60,7 +60,7 @@ def drawSideBars(x_var, y_multiVar, y_varLegends, ImgOutName, Title, Ylabel):
     #ax.set_xlim(-width)
     ax.set_xlim([-0.2,9])
 
-    ax.set_ylim([0.8,3])
+    ax.set_ylim([0.8,2.75])
     #ax.set_ylim([0,10])
 
 
