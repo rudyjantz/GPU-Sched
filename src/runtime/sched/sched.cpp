@@ -1061,17 +1061,17 @@ void parse_args(int argc, char **argv) {
   } else if (strncmp(argv[1], "cg", 3) == 0) {
     which_scheduler = SCHED_ALG_CG_E;
     if (argc != 3) {
-        usage_and_exit(argv[0]);
+      usage_and_exit(argv[0]);
     }
     for (i = 0; i < strlen(argv[2]); i++) {
-        if (!isdigit(argv[2][i])) {
-            usage_and_exit(argv[0]);
-        }
+      if (!isdigit(argv[2][i])) {
+        usage_and_exit(argv[0]);
+      }
     }
     num_workers = atoi(argv[2]);
     CG_JOBS_PER_GPU = num_workers / NUM_GPUS;
     if (num_workers % NUM_GPUS) {
-        CG_JOBS_PER_GPU++;
+      CG_JOBS_PER_GPU++;
     }
   } else if (strncmp(argv[1], "mgb", 4) == 0) {
     which_scheduler = SCHED_ALG_MGB_E;

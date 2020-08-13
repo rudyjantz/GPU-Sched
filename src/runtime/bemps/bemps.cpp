@@ -347,7 +347,7 @@ void bemps_begin(int id, int gx, int gy, int gz, int bx, int by, int bz,
                << "threads_per_block " << threads_per_block << "\n");
   warps = num_blocks * threads_per_block / 32;
   if ((num_blocks * threads_per_block) % 32) {
-      warps++;
+    warps++;
   }
   bemps_beacon_t beacon;
   beacon.cores = warps;
