@@ -16,7 +16,7 @@
 
 #include "bemps.hpp"
 
-#define BEMPS_SCHED_DEBUG
+//#define BEMPS_SCHED_DEBUG
 
 #define SCHED_DEFAULT_BATCH_SIZE 1
 #define SCHED_VECTOR_BATCH_SIZE 10
