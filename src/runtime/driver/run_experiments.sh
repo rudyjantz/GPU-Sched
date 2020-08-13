@@ -18,7 +18,8 @@
 BASE_PATH=/home/cc
 BEMPS_SCHED_PATH=${BASE_PATH}/GPU-Sched/build/runtime/sched
 WORKLOADER_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver
-WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/test
+#WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/test
+WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ppopp21
 RESULTS_PATH=results
 
 
@@ -44,7 +45,24 @@ WORKLOADS=(
     #p100_small_16jobs_4.wl  # sa.2, cg.6, mgb.24.10
     #p100_medium_16jobs_4.wl # sa.2, cg.4, mgb.16
     #p100_large_16jobs_4.wl # sa.2, cg.3, mgb.8
-    p100_large_16jobs_5.wl # sa.2, cg.3, mgb.8
+    #p100_large_16jobs_5.wl # sa.2, cg.3, mgb.8
+    # ppopp21 WORKLOADS_PATH
+    #p100_16_16jobs_0.wl
+    #p100_25_16jobs_0.wl
+    #p100_33_16jobs_0.wl
+    #p100_50_16jobs_0.wl
+    #p100_16_32jobs_0.wl
+    #p100_25_32jobs_0.wl
+    #p100_33_32jobs_0.wl
+    #p100_50_32jobs_0.wl
+    p100_16_16jobs_1.wl
+    p100_25_16jobs_1.wl
+    p100_33_16jobs_1.wl
+    p100_50_16jobs_1.wl
+    p100_16_32jobs_1.wl
+    p100_25_32jobs_1.wl
+    p100_33_32jobs_1.wl
+    p100_50_32jobs_1.wl
 )
 
 SINGLE_ASSIGNMENT_ARGS_ARR=(
@@ -52,17 +70,20 @@ SINGLE_ASSIGNMENT_ARGS_ARR=(
     #2
 )
 CG_ARGS_ARR=(
+    #2 # <-- Don't use unless sanity checking. This is equivalent to single-assignment.
     #3
     #4
+    #5
     #6
     #12
     #24
 )
 MGB_ARGS_ARR=(
     #6
-    8
-    #10
+    #8
+    10
     #12
+    #14
     #16
     #24
     #24.10 # num procs . max jobs waiting for GPU

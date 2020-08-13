@@ -15,7 +15,10 @@ def geomean(xs):
 #BASE_PATH = '/home/rudy/wo/gpu/GPU-Sched/src/runtime/driver/results'
 #BASE_PATH = '/home/cc/GPU-Sched/src/runtime/driver/results'
 #BASE_PATH = '/home/rudy/wo/gpu/bes-gpu/foo/scripts/cc/results-2020.08.10-10.30am'
-BASE_PATH = '/home/cc/GPU-Sched/src/runtime/driver/results-2020.08.10-10.30am'
+#BASE_PATH = '/home/cc/GPU-Sched/src/runtime/driver/results-2020.08.10-10.30am'
+
+#BASE_PATH = '/home/cc/GPU-Sched/src/runtime/driver/results-2020.08.12/16jobs'
+BASE_PATH = '/home/cc/GPU-Sched/src/runtime/driver/results-2020.08.12/32jobs'
 
 SCHED_LOG_SUF  = 'sched-log'
 SCHED_STAT_SUF = 'sched-stats'
@@ -35,10 +38,18 @@ workloads = [
     #'k80_large_16jobs_1',
     #'k80_large_16jobs_1',
     #'debug_07'
-    'p100_small_16jobs_3',
-    'p100_medium_16jobs_3',
-    'p100_large_16jobs_3',
-    'p100_random_16jobs_3',
+    #'p100_small_16jobs_3',
+    #'p100_medium_16jobs_3',
+    #'p100_large_16jobs_3',
+    #'p100_random_16jobs_3',
+    #'p100_50_16jobs_0',
+    #'p100_33_16jobs_0',
+    #'p100_25_16jobs_0',
+    #'p100_16_16jobs_0',
+    'p100_50_32jobs_0', # DIFFERENT BASE_PATH from 16jobs
+    'p100_33_32jobs_0',
+    'p100_25_32jobs_0',
+    'p100_16_32jobs_0',
 ]
 
 
@@ -268,28 +279,54 @@ for workload in workloads:
     #cg_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'cg.6', WRKLDR_LOG_SUF)
     #mgb_filename = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'mgb.6', WRKLDR_LOG_SUF)
 
-    if 'small' in workload:
-        print('small')
-        sa_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'single-assignment.2', WRKLDR_LOG_SUF)
-        cg_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'cg.6', WRKLDR_LOG_SUF)
-        mgb_filename = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'mgb.24.10', WRKLDR_LOG_SUF)
-    elif 'medium' in workload:
-        print('medium')
-        sa_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'single-assignment.2', WRKLDR_LOG_SUF)
-        cg_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'cg.4', WRKLDR_LOG_SUF)
-        mgb_filename = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'mgb.16', WRKLDR_LOG_SUF)
-    elif 'large' in workload:
-        print('large')
+    # 16jobs
+    #if 'p100_50' in workload:
+    #    print('p100_50')
+    #    sa_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'single-assignment.2', WRKLDR_LOG_SUF)
+    #    cg_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'cg.3', WRKLDR_LOG_SUF)
+    #    mgb_filename = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'mgb.10', WRKLDR_LOG_SUF)
+    #elif 'p100_33' in workload:
+    #    print('p100_33')
+    #    sa_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'single-assignment.2', WRKLDR_LOG_SUF)
+    #    cg_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'cg.3', WRKLDR_LOG_SUF)
+    #    mgb_filename = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'mgb.10', WRKLDR_LOG_SUF)
+    #elif 'p100_25' in workload:
+    #    print('p100_25')
+    #    sa_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'single-assignment.2', WRKLDR_LOG_SUF)
+    #    cg_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'cg.2', WRKLDR_LOG_SUF)
+    #    mgb_filename = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'mgb.10', WRKLDR_LOG_SUF)
+    #elif 'p100_16' in workload:
+    #    print('p100_16')
+    #    sa_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'single-assignment.2', WRKLDR_LOG_SUF)
+    #    cg_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'cg.5', WRKLDR_LOG_SUF)
+    #    mgb_filename = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'mgb.10', WRKLDR_LOG_SUF)
+    #else:
+    #    assert False
+
+    # 32jobs
+    if 'p100_50' in workload:
+        print('p100_50')
         sa_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'single-assignment.2', WRKLDR_LOG_SUF)
         cg_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'cg.3', WRKLDR_LOG_SUF)
-        mgb_filename = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'mgb.8', WRKLDR_LOG_SUF)
-    elif 'random' in workload:
-        print('random')
+        mgb_filename = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'mgb.10', WRKLDR_LOG_SUF)
+    elif 'p100_33' in workload:
+        print('p100_33')
         sa_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'single-assignment.2', WRKLDR_LOG_SUF)
-        cg_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'cg.6', WRKLDR_LOG_SUF)
-        mgb_filename = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'mgb.8', WRKLDR_LOG_SUF)
+        cg_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'cg.2', WRKLDR_LOG_SUF)
+        mgb_filename = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'mgb.10', WRKLDR_LOG_SUF)
+    elif 'p100_25' in workload:
+        print('p100_25')
+        sa_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'single-assignment.2', WRKLDR_LOG_SUF)
+        cg_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'cg.2', WRKLDR_LOG_SUF)
+        mgb_filename = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'mgb.10', WRKLDR_LOG_SUF)
+    elif 'p100_16' in workload:
+        print('p100_16')
+        sa_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'single-assignment.2', WRKLDR_LOG_SUF)
+        cg_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'cg.3', WRKLDR_LOG_SUF)
+        mgb_filename = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'mgb.10', WRKLDR_LOG_SUF)
     else:
         assert False
+
     print(sa_filename)
     print(cg_filename)
     print(mgb_filename)
