@@ -15,11 +15,13 @@
 #
 
 #BASE_PATH=/home/rudy/wo/gpu
-BASE_PATH=/home/cc
+#BASE_PATH=/home/cc
+BASE_PATH=/home/ubuntu
 BEMPS_SCHED_PATH=${BASE_PATH}/GPU-Sched/build/runtime/sched
 WORKLOADER_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver
 #WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/test
-WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ppopp21
+#WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ppopp21
+WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ppopp21-volta
 RESULTS_PATH=results
 
 
@@ -47,34 +49,41 @@ WORKLOADS=(
     #p100_large_16jobs_4.wl # sa.2, cg.3, mgb.8
     #p100_large_16jobs_5.wl # sa.2, cg.3, mgb.8
     # ppopp21 WORKLOADS_PATH
-    #p100_16_16jobs_0.wl
-    #p100_25_16jobs_0.wl
-    #p100_33_16jobs_0.wl
-    #p100_50_16jobs_0.wl
-    #p100_16_32jobs_0.wl
-    #p100_25_32jobs_0.wl
-    #p100_33_32jobs_0.wl
-    #p100_50_32jobs_0.wl
-    p100_16_16jobs_1.wl
-    p100_25_16jobs_1.wl
-    p100_33_16jobs_1.wl
-    p100_50_16jobs_1.wl
-    p100_16_32jobs_1.wl
-    p100_25_32jobs_1.wl
-    p100_33_32jobs_1.wl
-    p100_50_32jobs_1.wl
+    p100_16_16jobs_0.wl
+    p100_25_16jobs_0.wl
+    p100_33_16jobs_0.wl
+    p100_50_16jobs_0.wl
+    p100_16_32jobs_0.wl
+    p100_25_32jobs_0.wl
+    p100_33_32jobs_0.wl
+    p100_50_32jobs_0.wl
+    # nvprof versions of _0.wl
+    #p100_16_16jobs_1.wl
+    #p100_25_16jobs_1.wl
+    #p100_33_16jobs_1.wl
+    #p100_50_16jobs_1.wl
+    #p100_16_32jobs_1.wl
+    #p100_25_32jobs_1.wl
+    #p100_33_32jobs_1.wl
+    #p100_50_32jobs_1.wl
 )
 
 SINGLE_ASSIGNMENT_ARGS_ARR=(
     #1
-    #2
+    #2 # <-- 2-GPU system
+    #4 # <-- 4-GPU system
 )
 CG_ARGS_ARR=(
-    #2 # <-- Don't use unless sanity checking. This is equivalent to single-assignment.
-    #3
-    #4
+    #2 # <-- Don't use for 4-GPU system. Don't use for 2-GPU system unless sanity checking. This is equivalent to single-assignment.
+    #3 # <-- Don't use for 4-GPU system
+    #4 # <-- Don't use for 4-GPU system unless sanity checking. This is equivalent to single-assignment.
     #5
     #6
+    #7
+    #8
+    #9
+    #10
+    #11
     #12
     #24
 )
@@ -82,9 +91,11 @@ MGB_ARGS_ARR=(
     #6
     #8
     10
-    #12
-    #14
-    #16
+    12
+    14
+    16
+    18
+    20
     #24
     #24.10 # num procs . max jobs waiting for GPU
     #48.10 # num procs . max jobs waiting for GPU
