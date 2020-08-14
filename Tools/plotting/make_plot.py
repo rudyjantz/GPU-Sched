@@ -60,7 +60,7 @@ def drawSideBars(x_var, y_multiVar, y_varLegends, ImgOutName, Title, Ylabel):
     #ax.set_xlim(-width)
     ax.set_xlim([-0.2,9])
 
-    ax.set_ylim([0.8,2.75])
+    ax.set_ylim([0.8,1.75])
     #ax.set_ylim([0,10])
 
 
@@ -98,7 +98,7 @@ def drawSideBars(x_var, y_multiVar, y_varLegends, ImgOutName, Title, Ylabel):
     ax.yaxis.grid(color='gray', linestyle='dashed')
     ax.xaxis.grid(color='gray', linestyle='dashed')
     #legends
-    ax.legend(rects, y_varLegends, loc=(0.8,0.75), fontsize=legend_fontsize)
+    ax.legend(rects, y_varLegends, loc=(0.7,0.75), fontsize=legend_fontsize)
     #ax.legend(rects, y_varLegends, fontsize=legend_fontsize)
 
     plt.xticks(rotation=-45)
@@ -122,8 +122,8 @@ with open(sys.argv[1]) as f:
         y_multiVar[1].append(float(line[2])) # cg
         y_multiVar[2].append(float(line[3])) # mgb
 
-y_varLegends = [ "sa", "cg", "mgb" ]
+y_varLegends = [ "sa", "mgb-kernels", "mgb-data-xfers" ]
 ImgOutName = "throughput_improvement.png"
 Title = ""
-Ylabel = "Normalized Throughput Improvement"
+Ylabel = "Normalized Slowdown"
 drawSideBars(x_var, y_multiVar, y_varLegends, ImgOutName, Title, Ylabel)
