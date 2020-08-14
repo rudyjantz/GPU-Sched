@@ -62,16 +62,22 @@ WORKLOADS=(
     #p100_25_16jobs_1.wl
     #p100_33_16jobs_1.wl
     #p100_50_16jobs_1.wl
-    p100_16_32jobs_1.wl
+    #p100_16_32jobs_1.wl
     #p100_25_32jobs_1.wl
     #p100_33_32jobs_1.wl
     #p100_50_32jobs_1.wl
+    # ppopp21 extra last-minute runs
+    #v100_50_64jobs_0.wl
+    #v100_50_128jobs_0.wl
+    #v100_50_256jobs_0.wl
+    v100_50_512jobs_0.wl
+    v100_50_1024jobs_0.wl
 )
 
 SINGLE_ASSIGNMENT_ARGS_ARR=(
     #1
     #2 # <-- 2-GPU system
-    #4 # <-- 4-GPU system
+    4 # <-- 4-GPU system
 )
 CG_ARGS_ARR=(
     #2 # <-- Don't use for 4-GPU system. Don't use for 2-GPU system unless sanity checking. This is equivalent to single-assignment.
