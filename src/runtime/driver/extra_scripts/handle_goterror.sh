@@ -1,6 +1,7 @@
 #!/bin/bash
 
-FOLDER_BASE=/home/cc/GPU-Sched/src/runtime/driver/results-2020.08.12-bk2
+#FOLDER_BASE=/home/cc/GPU-Sched/src/runtime/driver/results-2020.08.12-bk2
+FOLDER_BASE=/home/ubuntu/GPU-Sched/src/runtime/driver/results-2020.08.13
 
 
 
