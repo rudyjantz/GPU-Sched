@@ -5,7 +5,8 @@ import random
 import time
 
 #BASE_PATH = '/home/rudy/wo/gpu'
-BASE_PATH = '/home/cc'
+#BASE_PATH = '/home/cc'
+BASE_PATH = '/home/ubuntu'
 RODINIA_BMARK_PATH = BASE_PATH+'/GPU-Sched/Benchmarks/rodinia_cuda_3.1/cuda'
 RODINIA_DATA_PATH  = BASE_PATH+'/GPU-Sched/Benchmarks/rodinia_cuda_3.1/data'
 
@@ -14,6 +15,7 @@ GPU_TO_MEM = {
     'gtx1080':  8 * 1024 * 1024 * 1024, #  8 GB
     'k80':     12 * 1024 * 1024 * 1024, # 12 GB
     'p100':    16 * 1024 * 1024 * 1024, # 16 GB
+    'v100':    16 * 1024 * 1024 * 1024, # 16 GB
 }
 
 
@@ -132,7 +134,7 @@ HELP_GPU = """gpu
 This field represents the GPU you intend to use for the workload you're
 generating. The size of the workload ultimately depends on the capability of
 the GPU (i.e. a "small" workload for a powerful GPU may be "large" for a weak
-GPU). This field must be one of "gtx0180", "k80", or "p100"."""
+GPU). This field must be one of "gtx0180", "k80", "p100", or "v100"."""
 
 HELP_NUM_JOBS = """num_jobs
 The number of jobs in the workload."""
