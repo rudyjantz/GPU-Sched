@@ -49,20 +49,20 @@ WORKLOADS=(
     #p100_large_16jobs_4.wl # sa.2, cg.3, mgb.8
     #p100_large_16jobs_5.wl # sa.2, cg.3, mgb.8
     # ppopp21 WORKLOADS_PATH
-    p100_16_16jobs_0.wl
-    p100_25_16jobs_0.wl
-    p100_33_16jobs_0.wl
-    p100_50_16jobs_0.wl
-    p100_16_32jobs_0.wl
-    p100_25_32jobs_0.wl
-    p100_33_32jobs_0.wl
-    p100_50_32jobs_0.wl
+    #p100_16_16jobs_0.wl
+    #p100_25_16jobs_0.wl
+    #p100_33_16jobs_0.wl
+    #p100_50_16jobs_0.wl
+    #p100_16_32jobs_0.wl
+    #p100_25_32jobs_0.wl
+    #p100_33_32jobs_0.wl
+    #p100_50_32jobs_0.wl
     # nvprof versions of _0.wl
     #p100_16_16jobs_1.wl
     #p100_25_16jobs_1.wl
     #p100_33_16jobs_1.wl
     #p100_50_16jobs_1.wl
-    #p100_16_32jobs_1.wl
+    p100_16_32jobs_1.wl
     #p100_25_32jobs_1.wl
     #p100_33_32jobs_1.wl
     #p100_50_32jobs_1.wl
@@ -90,12 +90,12 @@ CG_ARGS_ARR=(
 MGB_ARGS_ARR=(
     #6
     #8
-    10
-    12
-    14
+    #10
+    #12
+    #14
     16
-    18
-    20
+    #18
+    #20
     #24
     #24.10 # num procs . max jobs waiting for GPU
     #48.10 # num procs . max jobs waiting for GPU
