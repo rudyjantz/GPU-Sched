@@ -16,76 +16,64 @@
 
 #include "bemps.hpp"
 
-//#define BEMPS_SCHED_DEBUG
+#define BEMPS_SCHED_DEBUG
 
 #define SCHED_DEFAULT_BATCH_SIZE 1
 #define SCHED_VECTOR_BATCH_SIZE 10
 #define SCHED_MGB_BATCH_SIZE    10
 
-// Based on nvidia-smi
-//const long P100_PCIE_TOTAL_MEM_KB = 16280L * 1024;
-const long TESLA_K80_TOTAL_MEM_KB = 11441L * 1024;
-const long GTX_1080_TOTAL_MEM_KB = 8116L * 1024;
 
-const long P100_PCIE_TOTAL_MEM_KB = 14000L * 1024;
-const long V100_SXM2_TOTAL_MEM_KB = 14000L * 1024;
+#define GTX_1080_SPECS {            \
+  .mem_B = 8116L * 1024 * 1024,     \
+  .cores = 2560,                    \
+  .sms   = 20,                      \
+  .thread_blocks_per_sm = 32,       \
+  .warps_per_sm         = 64,       \
+  .warps                = 20 * 64   \
+}
+
+#define P100_PCIE_SPECS {           \
+  .mem_B = 14000L * 1024 * 1024,    \
+  .cores = 3584,                    \
+  .sms   = 60,                      \
+  .thread_blocks_per_sm = 32,       \
+  .warps_per_sm         = 64,       \
+  .warps                = 60 * 64   \
+}
+
+#define V100_SXM2_SPECS {           \
+  .mem_B = 14000L * 1024 * 1024,    \
+  .cores = 3584,                    \
+  .sms   = 84,                      \
+  .thread_blocks_per_sm = 32,       \
+  .warps_per_sm         = 64,       \
+  .warps                = 84 * 64   \
+}
+
 
 #if defined(GPU_RES_SLOP)
 #define NUM_GPUS 1
-#define INIT_GPU_RES()                               \
-  GPU_RES[0].mem_B = GTX_1080_TOTAL_MEM_KB * 1024;   \
-  GPU_RES[0].cores = 2560;                           \
-  memset(gpu_res_in_use, 0, sizeof(gpu_res_in_use)); \
+#define INIT_GPU_RES()                                  \
+  GPU_RES[0] = GTX_1080_SPECS;                          \
+  memset(gpu_res_in_use, 0, sizeof(gpu_res_in_use));    \
   dump_gpu_res("slop");
-
-#elif defined(GPU_RES_CC_2)
-#define NUM_GPUS 2
-#define INIT_GPU_RES()                               \
-  GPU_RES[0].mem_B = TESLA_K80_TOTAL_MEM_KB * 1024;  \
-  GPU_RES[0].cores = 2496;                           \
-  GPU_RES[1].mem_B = TESLA_K80_TOTAL_MEM_KB * 1024;  \
-  GPU_RES[1].cores = 2496;                           \
-  memset(gpu_res_in_use, 0, sizeof(gpu_res_in_use)); \
-  dump_gpu_res("cc_2");
 
 #elif defined(GPU_RES_CC_2P)
 #define NUM_GPUS 2
-#define INIT_GPU_RES()                               \
-  GPU_RES[0].mem_B = P100_PCIE_TOTAL_MEM_KB * 1024;  \
-  GPU_RES[0].cores = 3584;                           \
-  GPU_RES[1].mem_B = P100_PCIE_TOTAL_MEM_KB * 1024;  \
-  GPU_RES[1].cores = 3584;                           \
-  memset(gpu_res_in_use, 0, sizeof(gpu_res_in_use)); \
+#define INIT_GPU_RES()                                  \
+  GPU_RES[0] = P100_PCIE_SPECS;                         \
+  GPU_RES[1] = P100_PCIE_SPECS;                         \
+  memset(gpu_res_in_use, 0, sizeof(gpu_res_in_use));    \
   dump_gpu_res("cc_2p");
-
-#elif defined(GPU_RES_CC_4)
-#define NUM_GPUS 4
-#define INIT_GPU_RES()                                                     \
-  assert(0 &&                                                              \
-         "Finish defining GPU_RES_CC_4. It currently holds dummy values"); \
-  GPU_RES[0].mem_B = 100000;                                               \
-  GPU_RES[0].cores = 2500;                                                 \
-  GPU_RES[1].mem_B = 100000;                                               \
-  GPU_RES[1].cores = 2500;                                                 \
-  GPU_RES[2].mem_B = 100000;                                               \
-  GPU_RES[2].cores = 2500;                                                 \
-  GPU_RES[3].mem_B = 100000;                                               \
-  GPU_RES[3].cores = 2500;                                                 \
-  memset(gpu_res_in_use, 0, sizeof(gpu_res_in_use));                       \
-  dump_gpu_res("cc_4");
 
 #elif defined(GPU_RES_AWS_4)
 #define NUM_GPUS 4
-#define INIT_GPU_RES()                                                     \
-  GPU_RES[0].mem_B = V100_SXM2_TOTAL_MEM_KB * 1024;                        \
-  GPU_RES[0].cores = 5120;                                                 \
-  GPU_RES[1].mem_B = V100_SXM2_TOTAL_MEM_KB * 1024;                        \
-  GPU_RES[1].cores = 5120;                                                 \
-  GPU_RES[2].mem_B = V100_SXM2_TOTAL_MEM_KB * 1024;                        \
-  GPU_RES[2].cores = 5120;                                                 \
-  GPU_RES[3].mem_B = V100_SXM2_TOTAL_MEM_KB * 1024;                        \
-  GPU_RES[3].cores = 5120;                                                 \
-  memset(gpu_res_in_use, 0, sizeof(gpu_res_in_use));                       \
+#define INIT_GPU_RES()                                  \
+  GPU_RES[0] = V100_SXM2_SPECS;                         \
+  GPU_RES[1] = V100_SXM2_SPECS;                         \
+  GPU_RES[2] = V100_SXM2_SPECS;                         \
+  GPU_RES[3] = V100_SXM2_SPECS;                         \
+  memset(gpu_res_in_use, 0, sizeof(gpu_res_in_use));    \
   dump_gpu_res("aws_4");
 
 #else
@@ -140,7 +128,11 @@ typedef enum {
 
 struct gpu_res_s {
   long mem_B;
-  long cores;
+  unsigned int cores;
+  unsigned int sms;
+  unsigned int thread_blocks_per_sm;
+  unsigned int warps_per_sm;
+  unsigned int warps; // max available warps
 };
 
 typedef struct {
@@ -219,6 +211,10 @@ static inline void dump_gpu_res(const char *which_env) {
     BEMPS_SCHED_LOG("  GPU " << i << "\n");
     BEMPS_SCHED_LOG("  mem_B: " << GPU_RES[i].mem_B << "\n");
     BEMPS_SCHED_LOG("  cores: " << GPU_RES[i].cores << "\n");
+    BEMPS_SCHED_LOG("  sms: " << GPU_RES[i].sms << "\n");
+    BEMPS_SCHED_LOG("  thread_blocks_per_sm: " << GPU_RES[i].thread_blocks_per_sm << "\n");
+    BEMPS_SCHED_LOG("  warps_per_sm: " << GPU_RES[i].warps_per_sm << "\n");
+    BEMPS_SCHED_LOG("  warps: " << GPU_RES[i].warps << "\n");
   }
 }
 
@@ -241,15 +237,6 @@ static inline void set_wakeup_time_ns(struct timespec *ts_p) {
   //BEMPS_SCHED_LOG("ts_p s: " << ts_p->tv_sec << "\n");
 }
 
-void consume_beacon(bemps_beacon_t *beacon_p) {
-  // TODO: Need to implement the scheduling algorithm, which ultimately
-  // decides how we want to consume the beacons. One idea might be to
-  // first group the beacons (while we advance the tail to the head),
-  // and then assign device IDs in a separate loop.
-  BEMPS_SCHED_LOG("mem_B(" << beacon_p->mem_B << ")"
-                           << " cores(" << beacon_p->cores << ")"
-                           << "\n");
-}
 
 void dump_stats(void) {
 #define STATS_LOG(str)    \
@@ -381,13 +368,13 @@ void sched_mgb(void) {
           tmp_dev_id = comm->sched_notif.device_id;
           // Add (don't subtract), because mem_B is negative already
           long tmp_bytes_to_free = comm->beacon.mem_B;
-          long tmp_cores_to_free = comm->beacon.cores;
+          long tmp_warps_to_free = comm->beacon.warps;
           BEMPS_SCHED_LOG("Freeing " << tmp_bytes_to_free << " bytes "
                           << "from device " << tmp_dev_id << "\n");
-          BEMPS_SCHED_LOG("Freeing " << tmp_cores_to_free << " cores "
+          BEMPS_SCHED_LOG("Freeing " << tmp_warps_to_free << " warps "
                           << "from device " << tmp_dev_id << "\n");
           gpu_res_in_use[tmp_dev_id].mem_B += tmp_bytes_to_free;
-          gpu_res_in_use[tmp_dev_id].cores += tmp_cores_to_free;
+          gpu_res_in_use[tmp_dev_id].warps += tmp_warps_to_free;
           --*jobs_running_on_gpu;
         } else {
           stats.num_beacons++;
@@ -425,20 +412,20 @@ void sched_mgb(void) {
       }
 
       // The target device for a process must have memory available for it,
-      // and it should be the device with the least cores currently in use.
-      long curr_min_cores = LONG_MAX;
+      // and it should be the device with the least warps currently in use.
+      unsigned int curr_min_warps = UINT_MAX;
       int target_dev_id = 0;
       for (tmp_dev_id = 0; tmp_dev_id < NUM_GPUS; tmp_dev_id++) {
         BEMPS_SCHED_LOG("Checking device " << tmp_dev_id << "\n"
                         << "  Total avail bytes: " << GPU_RES[tmp_dev_id].mem_B << "\n"
                         << "  In-use bytes: " << gpu_res_in_use[tmp_dev_id].mem_B << "\n"
                         << "  Trying-to-fit bytes: " << comm->beacon.mem_B << "\n"
-                        << "  In-use cores: " << gpu_res_in_use[tmp_dev_id].cores << "\n"
-                        << "  Trying-to-add cores: " << comm->beacon.cores << "\n");
+                        << "  In-use warps: " << gpu_res_in_use[tmp_dev_id].warps << "\n"
+                        << "  Trying-to-add warps: " << comm->beacon.warps << "\n");
         if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
              GPU_RES[tmp_dev_id].mem_B)) {
-          if (gpu_res_in_use[tmp_dev_id].cores < curr_min_cores) {
-              curr_min_cores = gpu_res_in_use[tmp_dev_id].cores;
+          if (gpu_res_in_use[tmp_dev_id].warps < curr_min_warps) {
+              curr_min_warps = gpu_res_in_use[tmp_dev_id].warps;
               target_dev_id = tmp_dev_id;
               assigned = 1;
           }
@@ -456,13 +443,13 @@ void sched_mgb(void) {
         // went into the boomers list
       } else {
         long tmp_bytes_to_add = comm->beacon.mem_B;
-        long tmp_cores_to_add = comm->beacon.cores;
+        long tmp_warps_to_add = comm->beacon.warps;
         BEMPS_SCHED_LOG("Adding " << tmp_bytes_to_add << " bytes "
                         << "to device " << target_dev_id << "\n");
-        BEMPS_SCHED_LOG("Adding " << tmp_cores_to_add << " cores "
+        BEMPS_SCHED_LOG("Adding " << tmp_warps_to_add << " warps "
                         << "to device " << target_dev_id << "\n");
         gpu_res_in_use[target_dev_id].mem_B += tmp_bytes_to_add;
-        gpu_res_in_use[target_dev_id].cores += tmp_cores_to_add;
+        gpu_res_in_use[target_dev_id].warps += tmp_warps_to_add;
         BEMPS_SCHED_LOG("sem_post for pid(" << comm->pid << ") "
                                             << "on device(" << target_dev_id
                                             << ")\n");
@@ -718,7 +705,7 @@ void sched_vector(void) {
         tmp_dev_id = comm->sched_notif.device_id;
         // Add (don't subtract), because mem_B is negative already
         gpu_res_in_use[tmp_dev_id].mem_B += comm->beacon.mem_B;
-        gpu_res_in_use[tmp_dev_id].cores += comm->beacon.cores;
+        gpu_res_in_use[tmp_dev_id].warps += comm->beacon.warps;
       } else {
         stats.num_beacons++;
         boomers.push_back(comm);
@@ -754,12 +741,12 @@ void sched_vector(void) {
       for (tmp_dev_id = 0; tmp_dev_id < NUM_GPUS; tmp_dev_id++) {
         /*if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
              GPU_RES[tmp_dev_id].mem_B) &&
-            ((gpu_res_in_use[tmp_dev_id].cores + comm->beacon.cores) <
-             GPU_RES[tmp_dev_id].cores)) {*/
+            ((gpu_res_in_use[tmp_dev_id].warps + comm->beacon.warps) <
+             GPU_RES[tmp_dev_id].warps)) {*/
         if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
              GPU_RES[tmp_dev_id].mem_B)) {
           gpu_res_in_use[tmp_dev_id].mem_B += comm->beacon.mem_B;
-          gpu_res_in_use[tmp_dev_id].cores += comm->beacon.cores;
+          gpu_res_in_use[tmp_dev_id].warps += comm->beacon.warps;
           assigned = 1;
           break;
         }
@@ -830,12 +817,12 @@ void sched_round_robin(void) {
       while (1) {
         /*if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
              GPU_RES[tmp_dev_id].mem_B) &&
-            ((gpu_res_in_use[tmp_dev_id].cores + comm->beacon.cores) <
-             GPU_RES[tmp_dev_id].cores)) {*/
+            ((gpu_res_in_use[tmp_dev_id].warps + comm->beacon.warps) <
+             GPU_RES[tmp_dev_id].warps)) {*/
         if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
              GPU_RES[tmp_dev_id].mem_B)) {
           gpu_res_in_use[tmp_dev_id].mem_B += comm->beacon.mem_B;
-          gpu_res_in_use[tmp_dev_id].cores += comm->beacon.cores;
+          gpu_res_in_use[tmp_dev_id].warps += comm->beacon.warps;
           assigned = 1;
           break;
         }
@@ -893,7 +880,7 @@ void sched_round_robin(void) {
         tmp_dev_id = comm->sched_notif.device_id;
         // Add (don't subtract), because mem_B is negative already
         gpu_res_in_use[tmp_dev_id].mem_B += comm->beacon.mem_B;
-        gpu_res_in_use[tmp_dev_id].cores += comm->beacon.cores;
+        gpu_res_in_use[tmp_dev_id].warps += comm->beacon.warps;
       }
 
       *tail_p = (*tail_p + 1) & (BEMPS_BEACON_BUF_SZ - 1);
@@ -919,12 +906,12 @@ void sched_round_robin(void) {
       while (1) {
         /*if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
              GPU_RES[tmp_dev_id].mem_B) &&
-            ((gpu_res_in_use[tmp_dev_id].cores + comm->beacon.cores) <
-             GPU_RES[tmp_dev_id].cores)) {*/
+            ((gpu_res_in_use[tmp_dev_id].warps + comm->beacon.warps) <
+             GPU_RES[tmp_dev_id].warps)) {*/
         if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
              GPU_RES[tmp_dev_id].mem_B)) {
           gpu_res_in_use[tmp_dev_id].mem_B += comm->beacon.mem_B;
-          gpu_res_in_use[tmp_dev_id].cores += comm->beacon.cores;
+          gpu_res_in_use[tmp_dev_id].warps += comm->beacon.warps;
           assigned = 1;
           BEMPS_SCHED_LOG("  assigned\n");
           break;
