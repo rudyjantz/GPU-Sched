@@ -182,6 +182,7 @@ static inline int _push_beacon(bemps_beacon_t *beacon_p) {
   comm->timestamp_ns = _get_time_ns();
   comm->beacon.mem_B = beacon_p->mem_B;
   comm->beacon.warps = beacon_p->warps;
+  comm->beacon.thread_blocks = beacon_p->thread_blocks;
   comm->pid = pid;
 
   // XXX This should be the last field that we change in the comm structure,
@@ -304,6 +305,7 @@ static inline void _reset_comm(bemps_shm_comm_t *comm) {
   comm->state = BEMPS_BEACON_STATE_COMPLETED_E;
   comm->beacon.mem_B = 0;
   comm->beacon.warps = 0;
+  comm->beacon.thread_blocks = 0;
   comm->sched_notif.device_id = -1;
 }
 
@@ -314,7 +316,8 @@ void bemps_beacon(int bemps_tid, bemps_beacon_t *beacon) {
   BEMPS_STATS_LOG("pid " << pid << " , "
                << "bemps_tid " << bemps_tid << " , "
                << "mem_B " << beacon->mem_B << " , "
-               << "warps " << beacon->warps << "\n");
+               << "warps " << beacon->warps << " , "
+               << "thread_blocks " << beacon->thread_blocks << "\n");
 
   q_idx = _push_beacon(beacon);
   bemps_tid_to_q_idx[bemps_tid] = q_idx;
@@ -331,9 +334,10 @@ void bemps_beacon(int bemps_tid, bemps_beacon_t *beacon) {
 extern "C" {
 void bemps_begin(int id, int gx, int gy, int gz, int bx, int by, int bz,
                  int64_t membytes) {
-  int num_blocks;
-  int threads_per_block;
-  int warps;
+  long num_blocks;
+  long threads_per_block;
+  long warps;
+  bemps_beacon_t beacon;
 
   bemps_stopwatch_start(&bemps_stopwatches[BEMPS_STOPWATCH_BEACON]);
   if (!beacon_initialized) {
@@ -349,9 +353,9 @@ void bemps_begin(int id, int gx, int gy, int gz, int bx, int by, int bz,
   if ((num_blocks * threads_per_block) % 32) {
     warps++;
   }
-  bemps_beacon_t beacon;
-  beacon.warps = warps;
   beacon.mem_B = membytes;
+  beacon.warps = warps;
+  beacon.thread_blocks = num_blocks;
   bemps_beacon(id, &beacon);
   bemps_stopwatch_end(&bemps_stopwatches[BEMPS_STOPWATCH_BEACON]);
 }
@@ -379,6 +383,7 @@ void bemps_free(int bemps_tid) {
   bemps_shm_comm_t *comm;
   long mem_B;
   long warps;
+  long thread_blocks;
   int device_id;
 
   bemps_stopwatch_start(&bemps_stopwatches[BEMPS_STOPWATCH_FREE]);
@@ -391,6 +396,7 @@ void bemps_free(int bemps_tid) {
   comm = &bemps_shm.comm[orig_beacon_q_idx];
   mem_B = comm->beacon.mem_B;
   warps = comm->beacon.warps;
+  thread_blocks = comm->beacon.thread_blocks;
   device_id = comm->sched_notif.device_id;
   bemps_tid_to_q_idx.erase(bemps_tid);
   _reset_comm(comm);
@@ -409,6 +415,7 @@ void bemps_free(int bemps_tid) {
   comm->timestamp_ns = _get_time_ns();
   comm->beacon.mem_B = -1L * mem_B;
   comm->beacon.warps = -1L * warps;
+  comm->beacon.thread_blocks = -1L * thread_blocks;
   comm->sched_notif.device_id = device_id;
   comm->pid = pid;
 

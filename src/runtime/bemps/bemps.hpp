@@ -13,9 +13,9 @@
 
 // The beacon type for an application calling the bemps library.
 typedef struct {
-  long mem_B;
-  unsigned int thread_blocks;
-  unsigned int warps;
+  long mem_B; // Signed. Negatives currently used for frees. Improve later.
+  long warps; // same
+  long thread_blocks; // same
   // TODO: constant memory
 } bemps_beacon_t;
 

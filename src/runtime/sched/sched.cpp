@@ -132,7 +132,8 @@ struct gpu_res_s {
   unsigned int sms;
   unsigned int thread_blocks_per_sm;
   unsigned int warps_per_sm;
-  unsigned int warps; // max available warps
+  long warps; // in-use warps. signed (to match beacon struct)
+  long thread_blocks; // in-use thread blocks. signed (to match beacon struct)
 };
 
 typedef struct {
@@ -215,6 +216,7 @@ static inline void dump_gpu_res(const char *which_env) {
     BEMPS_SCHED_LOG("  thread_blocks_per_sm: " << GPU_RES[i].thread_blocks_per_sm << "\n");
     BEMPS_SCHED_LOG("  warps_per_sm: " << GPU_RES[i].warps_per_sm << "\n");
     BEMPS_SCHED_LOG("  warps: " << GPU_RES[i].warps << "\n");
+    BEMPS_SCHED_LOG("  thread_blocks: " << GPU_RES[i].thread_blocks << "\n");
   }
 }
 
@@ -413,7 +415,177 @@ void sched_mgb(void) {
 
       // The target device for a process must have memory available for it,
       // and it should be the device with the least warps currently in use.
-      unsigned int curr_min_warps = UINT_MAX;
+      long curr_min_warps = LONG_MAX;
+      int target_dev_id = 0;
+      for (tmp_dev_id = 0; tmp_dev_id < NUM_GPUS; tmp_dev_id++) {
+        BEMPS_SCHED_LOG("Checking device " << tmp_dev_id << "\n"
+                        << "  Total avail bytes: " << GPU_RES[tmp_dev_id].mem_B << "\n"
+                        << "  In-use bytes: " << gpu_res_in_use[tmp_dev_id].mem_B << "\n"
+                        << "  Trying-to-fit bytes: " << comm->beacon.mem_B << "\n"
+                        << "  In-use warps: " << gpu_res_in_use[tmp_dev_id].warps << "\n"
+                        << "  Trying-to-add warps: " << comm->beacon.warps << "\n");
+        if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
+             GPU_RES[tmp_dev_id].mem_B)) {
+          if (gpu_res_in_use[tmp_dev_id].warps < curr_min_warps) {
+              curr_min_warps = gpu_res_in_use[tmp_dev_id].warps;
+              target_dev_id = tmp_dev_id;
+              assigned = 1;
+          }
+        } else {
+            BEMPS_SCHED_LOG("Couldn't fit " << comm->beacon.mem_B << "\n");
+        }
+      }
+
+      if (!assigned) {
+        // FIXME: need to add stats, and possibly a way to reserve a
+        // GPU to prevent starving.
+        comm->age++;
+        boomers.push_back(comm);
+        // don't adjust jobs-waiting-on-gpu. it was incremented when job first
+        // went into the boomers list
+      } else {
+        long tmp_bytes_to_add = comm->beacon.mem_B;
+        long tmp_warps_to_add = comm->beacon.warps;
+        BEMPS_SCHED_LOG("Adding " << tmp_bytes_to_add << " bytes "
+                        << "to device " << target_dev_id << "\n");
+        BEMPS_SCHED_LOG("Adding " << tmp_warps_to_add << " warps "
+                        << "to device " << target_dev_id << "\n");
+        gpu_res_in_use[target_dev_id].mem_B += tmp_bytes_to_add;
+        gpu_res_in_use[target_dev_id].warps += tmp_warps_to_add;
+        BEMPS_SCHED_LOG("sem_post for pid(" << comm->pid << ") "
+                                            << "on device(" << target_dev_id
+                                            << ")\n");
+        // FIXME Is this SCHEDULER_READ state helping at all?
+        comm->state = BEMPS_BEACON_STATE_SCHEDULER_READ_E;
+        comm->sched_notif.device_id = target_dev_id;
+        comm->state = BEMPS_BEACON_STATE_SCHEDULED_E;
+        sem_post(&comm->sched_notif.sem);
+        ++*jobs_running_on_gpu;
+        --*jobs_waiting_on_gpu;
+      }
+    }
+    bemps_stopwatch_end(&sched_stopwatches[SCHED_STOPWATCH_AWAKE]);
+  }
+}
+
+
+
+// Our custom scheduler, multi-GPU with beacons.
+// XXX deprecrated. This algorithm treated memory as a hard requirement, and
+// then just chose the GPU with the fewest current warps. It didn't consider
+// thread blocks. It didn't consider when warp limits might be saturated.
+void sched_mgb_deprecated(void) {
+  int tmp_dev_id;
+  int *head_p;
+  int *tail_p;
+  int *jobs_running_on_gpu;
+  int *jobs_waiting_on_gpu;
+  int assigned;
+  struct timespec ts;
+  int boomers_len;
+  int i;
+  bemps_shm_comm_t *comm;
+  int batch_size;
+
+  head_p = &bemps_shm_p->gen->beacon_q_head;
+  tail_p = &bemps_shm_p->gen->beacon_q_tail;
+  jobs_running_on_gpu = &bemps_shm_p->gen->jobs_running_on_gpu;
+  jobs_waiting_on_gpu = &bemps_shm_p->gen->jobs_waiting_on_gpu;
+
+  while (1) {
+    set_wakeup_time_ns(&ts);
+
+    // wait until we get a signal or time out
+    pthread_mutex_lock(&bemps_shm_p->gen->lock);
+    // TODO spurious wakeups ? shouldn't make a big difference to wake up
+    // randomly from time to time before the batch is ready
+    pthread_cond_timedwait(&bemps_shm_p->gen->cond, &bemps_shm_p->gen->lock,
+                           &ts);
+    pthread_mutex_unlock(&bemps_shm_p->gen->lock);
+    bemps_stopwatch_start(&sched_stopwatches[SCHED_STOPWATCH_AWAKE]);
+
+    ALIVE_MSG();
+
+    // First loop: Catch the scheduler's tail back up with the beacon
+    // queue's head. If we see a free-beacon, then reclaim that resource.
+    //BEMPS_SCHED_LOG("*head_p: " << (*head_p) << "\n");
+    //BEMPS_SCHED_LOG("*tail_p: " << (*tail_p) << "\n");
+    batch_size = 0;
+    while (*tail_p != *head_p) {
+      BEMPS_SCHED_LOG("*head_p: " << (*head_p) << "\n");
+      BEMPS_SCHED_LOG("*tail_p: " << (*tail_p) << "\n");
+
+      comm = &bemps_shm_p->comm[*tail_p];
+      while (comm->state != BEMPS_BEACON_STATE_BEACON_FIRED_E) {
+        // TODO probably want to track a stat for this case
+        BEMPS_SCHED_LOG("WARNING: Scheduler hit a beacon before FIRED "
+                        << "was set. (Not a bug, but unless we're "
+                        << "flooded with beacons, this should be rare."
+                        << "\n");
+        BEMPS_SCHED_LOG("WARNING: *tail_p: " << (*tail_p) << "\n");
+        // FIXME sync shouldn't hurt, but may not help?
+        __sync_synchronize();
+      }
+
+      if (comm->exit_flag) {
+        BEMPS_SCHED_LOG("seeing exit flag\n");
+        comm->exit_flag = 0;
+      } else {
+        assert(comm->beacon.mem_B);
+        BEMPS_SCHED_LOG("First loop seeing mem_B: " << comm->beacon.mem_B
+                                                    << "\n");
+        if (comm->beacon.mem_B < 0) {
+          BEMPS_SCHED_LOG("Received free-beacon for pid " << comm->pid << "\n");
+          stats.num_frees++;
+          tmp_dev_id = comm->sched_notif.device_id;
+          // Add (don't subtract), because mem_B is negative already
+          long tmp_bytes_to_free = comm->beacon.mem_B;
+          long tmp_warps_to_free = comm->beacon.warps;
+          BEMPS_SCHED_LOG("Freeing " << tmp_bytes_to_free << " bytes "
+                          << "from device " << tmp_dev_id << "\n");
+          BEMPS_SCHED_LOG("Freeing " << tmp_warps_to_free << " warps "
+                          << "from device " << tmp_dev_id << "\n");
+          gpu_res_in_use[tmp_dev_id].mem_B += tmp_bytes_to_free;
+          gpu_res_in_use[tmp_dev_id].warps += tmp_warps_to_free;
+          --*jobs_running_on_gpu;
+        } else {
+          stats.num_beacons++;
+          boomers.push_back(comm);
+          batch_size++; // batch size doesn't include free() beacons
+          ++*jobs_waiting_on_gpu;
+        }
+      }
+
+      *tail_p = (*tail_p + 1) & (BEMPS_BEACON_BUF_SZ - 1);
+    }
+
+    if (batch_size > stats.max_observed_batch_size) {
+      stats.max_observed_batch_size = batch_size;
+    }
+
+    // Second loop: Walk the boomers. This time handle regular beacons, and
+    // attempt to assign them to a device. The boomers are sorted by memory
+    // footprint, highest to lowest.
+    boomers.sort(mem_footprint_compare);
+    boomers_len = boomers.size();
+    if (boomers_len > stats.max_len_boomers) {
+      stats.max_len_boomers = boomers_len;
+    }
+    if (boomers_len > 0) {
+      BEMPS_SCHED_LOG("boomers_len: " << boomers_len << "\n");
+    }
+    for (i = 0; i < boomers_len; i++) {
+      assigned = 0;
+      comm = boomers.front();
+      boomers.pop_front();
+
+      if (comm->age > stats.max_age) {
+        stats.max_age = comm->age;
+      }
+
+      // The target device for a process must have memory available for it,
+      // and it should be the device with the least warps currently in use.
+      long curr_min_warps = LONG_MAX;
       int target_dev_id = 0;
       for (tmp_dev_id = 0; tmp_dev_id < NUM_GPUS; tmp_dev_id++) {
         BEMPS_SCHED_LOG("Checking device " << tmp_dev_id << "\n"
