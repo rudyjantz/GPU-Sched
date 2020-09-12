@@ -29,7 +29,6 @@
   .sms   = 20,                      \
   .thread_blocks_per_sm = 32,       \
   .warps_per_sm         = 64,       \
-  .warps                = 20 * 64   \
 }
 
 #define P100_PCIE_SPECS {           \
@@ -38,7 +37,6 @@
   .sms   = 60,                      \
   .thread_blocks_per_sm = 32,       \
   .warps_per_sm         = 64,       \
-  .warps                = 60 * 64   \
 }
 
 #define V100_SXM2_SPECS {           \
@@ -47,38 +45,34 @@
   .sms   = 84,                      \
   .thread_blocks_per_sm = 32,       \
   .warps_per_sm         = 64,       \
-  .warps                = 84 * 64   \
 }
 
 
 #if defined(GPU_RES_SLOP)
 #define NUM_GPUS 1
-#define INIT_GPU_RES()                                  \
-  GPU_RES[0] = GTX_1080_SPECS;                          \
-  memset(gpu_res_in_use, 0, sizeof(gpu_res_in_use));    \
+#define INIT_GPUS()                                  \
+  GPUS[0] = GTX_1080_SPECS;                          \
   dump_gpu_res("slop");
 
 #elif defined(GPU_RES_CC_2P)
 #define NUM_GPUS 2
-#define INIT_GPU_RES()                                  \
-  GPU_RES[0] = P100_PCIE_SPECS;                         \
-  GPU_RES[1] = P100_PCIE_SPECS;                         \
-  memset(gpu_res_in_use, 0, sizeof(gpu_res_in_use));    \
+#define INIT_GPUS()                                  \
+  GPUS[0] = P100_PCIE_SPECS;                         \
+  GPUS[1] = P100_PCIE_SPECS;                         \
   dump_gpu_res("cc_2p");
 
 #elif defined(GPU_RES_AWS_4)
 #define NUM_GPUS 4
-#define INIT_GPU_RES()                                  \
-  GPU_RES[0] = V100_SXM2_SPECS;                         \
-  GPU_RES[1] = V100_SXM2_SPECS;                         \
-  GPU_RES[2] = V100_SXM2_SPECS;                         \
-  GPU_RES[3] = V100_SXM2_SPECS;                         \
-  memset(gpu_res_in_use, 0, sizeof(gpu_res_in_use));    \
+#define INIT_GPUS()                                  \
+  GPUS[0] = V100_SXM2_SPECS;                         \
+  GPUS[1] = V100_SXM2_SPECS;                         \
+  GPUS[2] = V100_SXM2_SPECS;                         \
+  GPUS[3] = V100_SXM2_SPECS;                         \
   dump_gpu_res("aws_4");
 
 #else
 #define NUM_GPUS 0
-#define INIT_GPU_RES() \
+#define INIT_GPUS() \
   assert(0 &&          \
          "Must define a valid GPU resource (e.g. GPU_RES_SLOP, \
                GPU_RES_CC_2, etc.)");
@@ -110,9 +104,17 @@ int SCHED_ALIVE_COUNT = 0;
   } while(0)
 
 
-#define SCHED_NUM_STOPWATCHES 1
+#define SCHED_NUM_STOPWATCHES 2
 typedef enum {
-  SCHED_STOPWATCH_AWAKE = 0 // time the scheduler spends awake and processing
+ // time the scheduler spends awake and processing
+  SCHED_STOPWATCH_AWAKE = 0,
+
+  // time spent in allocate_compute() on success
+  SCHED_STOPWATCH_ALLOCATE_COMPUTE_SUCCESS,
+
+  // time spent in allocate_compute() when resources aren't available
+  SCHED_STOPWATCH_ALLOCATE_COMPUTE_FAIL
+
 } sched_stopwatch_e;
 
 
@@ -126,14 +128,24 @@ typedef enum {
   SCHED_ALG_MGB_E
 } sched_alg_e;
 
-struct gpu_res_s {
+struct gpu_s {
   long mem_B;
   unsigned int cores;
   unsigned int sms;
   unsigned int thread_blocks_per_sm;
   unsigned int warps_per_sm;
-  long warps; // in-use warps. signed (to match beacon struct)
-  long thread_blocks; // in-use thread blocks. signed (to match beacon struct)
+};
+
+struct gpu_in_use_s {
+  long mem_B;
+  long warps;
+  int curr_sm; // the next streaming multiprocessor to assign
+  std::vector<std::pair<int, int>> sms; // (thread blocks, warps) on each SM
+};
+
+struct gpu_and_mem_s {
+  int which_gpu; // an index into gpus_in_use
+  long *mem_B;    // points to a gpu_in_use mem_B member
 };
 
 typedef struct {
@@ -167,17 +179,22 @@ std::list<device_id_count_t *> avail_device_id_counts;
 int CG_JOBS_PER_GPU = 0; // set by command-line args
 
 
+//
+// MGB scheduler
+//
+std::list<bemps_shm_comm_t *> boomers;
+std::map<pid_t, std::vector<std::pair<int, int>> > pid_to_sm_assignments;
+
 
 bemps_shm_t *bemps_shm_p;
 sched_stats_t stats;
 
-std::list<bemps_shm_comm_t *> boomers;
-
 sched_alg_e which_scheduler;
 int max_batch_size;
 
-struct gpu_res_s GPU_RES[NUM_GPUS];
-struct gpu_res_s gpu_res_in_use[NUM_GPUS];
+struct gpu_s GPUS[NUM_GPUS];
+struct gpu_in_use_s gpus_in_use[NUM_GPUS];
+struct gpu_and_mem_s gpus_by_mem[NUM_GPUS];
 
 void usage_and_exit(char *prog_name) {
   printf("\n");
@@ -210,13 +227,11 @@ static inline void dump_gpu_res(const char *which_env) {
                                                                << ")\n");
   for (i = 0; i < NUM_GPUS; i++) {
     BEMPS_SCHED_LOG("  GPU " << i << "\n");
-    BEMPS_SCHED_LOG("  mem_B: " << GPU_RES[i].mem_B << "\n");
-    BEMPS_SCHED_LOG("  cores: " << GPU_RES[i].cores << "\n");
-    BEMPS_SCHED_LOG("  sms: " << GPU_RES[i].sms << "\n");
-    BEMPS_SCHED_LOG("  thread_blocks_per_sm: " << GPU_RES[i].thread_blocks_per_sm << "\n");
-    BEMPS_SCHED_LOG("  warps_per_sm: " << GPU_RES[i].warps_per_sm << "\n");
-    BEMPS_SCHED_LOG("  warps: " << GPU_RES[i].warps << "\n");
-    BEMPS_SCHED_LOG("  thread_blocks: " << GPU_RES[i].thread_blocks << "\n");
+    BEMPS_SCHED_LOG("  mem_B: " << GPUS[i].mem_B << "\n");
+    BEMPS_SCHED_LOG("  cores: " << GPUS[i].cores << "\n");
+    BEMPS_SCHED_LOG("  sms: " << GPUS[i].sms << "\n");
+    BEMPS_SCHED_LOG("  thread_blocks_per_sm: " << GPUS[i].thread_blocks_per_sm << "\n");
+    BEMPS_SCHED_LOG("  warps_per_sm: " << GPUS[i].warps_per_sm << "\n");
   }
 }
 
@@ -249,9 +264,13 @@ void dump_stats(void) {
   } while (0)
   std::ofstream stats_file;
   bemps_stopwatch_t *sa;
+  bemps_stopwatch_t *acs;
+  bemps_stopwatch_t *acf;
 
   stats_file.open("sched-stats.out");
-  sa = &sched_stopwatches[SCHED_STOPWATCH_AWAKE];
+  sa  = &sched_stopwatches[SCHED_STOPWATCH_AWAKE];
+  acs = &sched_stopwatches[SCHED_STOPWATCH_ALLOCATE_COMPUTE_SUCCESS];
+  acf = &sched_stopwatches[SCHED_STOPWATCH_ALLOCATE_COMPUTE_FAIL];
 
   BEMPS_SCHED_LOG("Caught interrupt. Exiting.\n");
   STATS_LOG("num_beacons: " << stats.num_beacons << "\n");
@@ -266,6 +285,14 @@ void dump_stats(void) {
   STATS_LOG("min-awake-time-(ns): " << sa->min << "\n");
   STATS_LOG("max-awake-time-(ns): " << sa->max << "\n");
   STATS_LOG("avg-awake-time-(ns): " << sa->avg << "\n");
+  STATS_LOG("count-of-allocate-compute-success-times: " << acs->n << "\n");
+  STATS_LOG("min-acs-time-(ns): " << acs->min << "\n");
+  STATS_LOG("max-acs-time-(ns): " << acs->max << "\n");
+  STATS_LOG("avg-acs-time-(ns): " << acs->avg << "\n");
+  STATS_LOG("count-of-allocate-compute-fail-times: " << acf->n << "\n");
+  STATS_LOG("min-acf-time-(ns): " << acf->min << "\n");
+  STATS_LOG("max-acf-time-(ns): " << acf->max << "\n");
+  STATS_LOG("avg-acf-time-(ns): " << acf->avg << "\n");
 #endif
 
   stats_file.close();
@@ -302,6 +329,102 @@ struct AvailDevicesCompare {
 } avail_devices_compare;
 
 
+int sort_gpu_by_mem_in_use(const void *a_arg, const void *b_arg) {
+  struct gpu_and_mem_s *a = (struct gpu_and_mem_s *) a_arg;
+  struct gpu_and_mem_s *b = (struct gpu_and_mem_s *) b_arg;
+  if (*a->mem_B < *b->mem_B) {
+    return -1;
+  }
+  return 1;
+}
+
+
+// Eumlate the hardware's round-robin allocation to find the next available
+// streaming multiprocessor
+int get_next_avail_sm(std::vector<std::pair<int, int> > &sms,
+                      std::vector<std::pair<int, int> > &rq,
+                      int num_warps,
+                      int curr_sm) {
+
+  if (sms[curr_sm].first && sms[curr_sm].second >= num_warps) {
+    return curr_sm;
+  }
+
+  int num_sms = sms.size();
+  int vheader = (curr_sm + 1) % num_sms;
+
+  while (vheader != curr_sm) {
+    if ((sms[vheader].first - rq[vheader].first) &&
+      (sms[vheader].second - rq[vheader].second) >= num_warps) {
+      return vheader;
+    }
+    vheader = (vheader + 1) % num_sms;
+  }
+
+  return -1;
+}
+
+
+// emulate SM allocation of a GPU device.
+bool allocate_compute(std::vector<std::pair<int,int>> &sms,
+              bemps_shm_comm_t *comm,
+              int num_sms,
+              int *curr_sm) {
+  int num_thread_blocks = comm->beacon.thread_blocks;
+  // ignore off-by-one
+  int num_warps_per_block = comm->beacon.warps / comm->beacon.thread_blocks;
+  int avail_sm;
+  int i;
+
+  bemps_stopwatch_start(&sched_stopwatches[SCHED_STOPWATCH_ALLOCATE_COMPUTE_SUCCESS]);
+  bemps_stopwatch_start(&sched_stopwatches[SCHED_STOPWATCH_ALLOCATE_COMPUTE_FAIL]);
+
+  // A vector of length num_sms. Each element is a pair:
+  //   occupied thread blocks for that SM
+  //   occupied warps for that SM
+  std::vector<std::pair<int, int>> rq(num_sms, {0, 0});
+
+  while (num_thread_blocks) {
+    avail_sm = get_next_avail_sm(sms, rq, num_warps_per_block, *curr_sm);
+    if (avail_sm < 0) {
+      bemps_stopwatch_end(&sched_stopwatches[SCHED_STOPWATCH_ALLOCATE_COMPUTE_FAIL]);
+      BEMPS_SCHED_LOG("Compute not available for pid: " << comm->pid);
+      return false;
+    }
+    *curr_sm = avail_sm;
+    rq[avail_sm].first  += 1;
+    rq[avail_sm].second += num_warps_per_block;
+    num_thread_blocks--;
+  }
+
+  // ... all thread blocks have been assigned to an SM.
+  // commit the assignments, and update the SMs
+  BEMPS_SCHED_LOG("Committing compute resources for pid: " << comm->pid);
+  pid_to_sm_assignments[comm->pid] = rq;
+
+  for (i = 0; i < num_sms; i++) {
+    sms[i].first  -= rq[i].first;
+    sms[i].second -= rq[i].second;
+  }
+
+  bemps_stopwatch_end(&sched_stopwatches[SCHED_STOPWATCH_ALLOCATE_COMPUTE_SUCCESS]);
+  return true;
+}
+
+
+void release_compute(std::vector<std::pair<int,int>> &sms, bemps_shm_comm_t *comm, int num_sms) {
+  int i;
+  BEMPS_SCHED_LOG("Freeing compute resources for pid: " << comm->pid);
+  std::vector<std::pair<int,int>> &s = pid_to_sm_assignments[comm->pid];
+  for (i = 0; i < num_sms; i++) {
+    sms[i].first  += s[i].first;
+    sms[i].second += s[i].second;
+  }
+  pid_to_sm_assignments.erase(comm->pid);
+}
+
+
+
 
 // Our custom scheduler, multi-GPU with beacons
 void sched_mgb(void) {
@@ -316,6 +439,11 @@ void sched_mgb(void) {
   int i;
   bemps_shm_comm_t *comm;
   int batch_size;
+  int which_gpu;
+  bool allocated;
+  long mem_max;
+  long mem_in_use;
+  long mem_to_add;
 
   head_p = &bemps_shm_p->gen->beacon_q_head;
   tail_p = &bemps_shm_p->gen->beacon_q_tail;
@@ -370,13 +498,10 @@ void sched_mgb(void) {
           tmp_dev_id = comm->sched_notif.device_id;
           // Add (don't subtract), because mem_B is negative already
           long tmp_bytes_to_free = comm->beacon.mem_B;
-          long tmp_warps_to_free = comm->beacon.warps;
           BEMPS_SCHED_LOG("Freeing " << tmp_bytes_to_free << " bytes "
                           << "from device " << tmp_dev_id << "\n");
-          BEMPS_SCHED_LOG("Freeing " << tmp_warps_to_free << " warps "
-                          << "from device " << tmp_dev_id << "\n");
-          gpu_res_in_use[tmp_dev_id].mem_B += tmp_bytes_to_free;
-          gpu_res_in_use[tmp_dev_id].warps += tmp_warps_to_free;
+          gpus_in_use[tmp_dev_id].mem_B += tmp_bytes_to_free;
+          release_compute(gpus_in_use[tmp_dev_id].sms, comm, GPUS[tmp_dev_id].sms);
           --*jobs_running_on_gpu;
         } else {
           stats.num_beacons++;
@@ -414,27 +539,36 @@ void sched_mgb(void) {
       }
 
       // The target device for a process must have memory available for it,
-      // and it should be the device with the least warps currently in use.
-      long curr_min_warps = LONG_MAX;
+      // and it must also have sufficient space on its SMs to support its
+      // thread block and warp requirements.
       int target_dev_id = 0;
-      for (tmp_dev_id = 0; tmp_dev_id < NUM_GPUS; tmp_dev_id++) {
-        BEMPS_SCHED_LOG("Checking device " << tmp_dev_id << "\n"
-                        << "  Total avail bytes: " << GPU_RES[tmp_dev_id].mem_B << "\n"
-                        << "  In-use bytes: " << gpu_res_in_use[tmp_dev_id].mem_B << "\n"
-                        << "  Trying-to-fit bytes: " << comm->beacon.mem_B << "\n"
-                        << "  In-use warps: " << gpu_res_in_use[tmp_dev_id].warps << "\n"
-                        << "  Trying-to-add warps: " << comm->beacon.warps << "\n");
-        if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
-             GPU_RES[tmp_dev_id].mem_B)) {
-          if (gpu_res_in_use[tmp_dev_id].warps < curr_min_warps) {
-              curr_min_warps = gpu_res_in_use[tmp_dev_id].warps;
-              target_dev_id = tmp_dev_id;
-              assigned = 1;
-          }
-        } else {
-            BEMPS_SCHED_LOG("Couldn't fit " << comm->beacon.mem_B << "\n");
+
+      // sort the GPUs based by memory that's in use, from least to greatest
+      qsort(gpus_by_mem, NUM_GPUS, sizeof(struct gpu_and_mem_s), sort_gpu_by_mem_in_use);
+
+      // Now attempt to assign the process to a GPU.
+      i = 0;
+      do {
+        assert(*gpus_by_mem[i].mem_B == gpus_in_use[which_gpu].mem_B);
+        which_gpu  = gpus_by_mem[i].which_gpu;
+        mem_max    = GPUS[which_gpu].mem_B;
+        mem_in_use = gpus_in_use[which_gpu].mem_B;
+        mem_to_add = comm->beacon.mem_B;
+
+        if ((mem_in_use + mem_to_add) > mem_max) {
+            break;
         }
-      }
+
+        allocated = allocate_compute(gpus_in_use[which_gpu].sms,
+                             comm,
+                             GPUS[which_gpu].sms,
+                             &gpus_in_use[which_gpu].curr_sm);
+        if (allocated) {
+            assigned = 1;
+            break;
+        }
+        i++;
+      } while (i < NUM_GPUS);
 
       if (!assigned) {
         // FIXME: need to add stats, and possibly a way to reserve a
@@ -445,13 +579,9 @@ void sched_mgb(void) {
         // went into the boomers list
       } else {
         long tmp_bytes_to_add = comm->beacon.mem_B;
-        long tmp_warps_to_add = comm->beacon.warps;
         BEMPS_SCHED_LOG("Adding " << tmp_bytes_to_add << " bytes "
                         << "to device " << target_dev_id << "\n");
-        BEMPS_SCHED_LOG("Adding " << tmp_warps_to_add << " warps "
-                        << "to device " << target_dev_id << "\n");
-        gpu_res_in_use[target_dev_id].mem_B += tmp_bytes_to_add;
-        gpu_res_in_use[target_dev_id].warps += tmp_warps_to_add;
+        gpus_in_use[target_dev_id].mem_B += tmp_bytes_to_add;
         BEMPS_SCHED_LOG("sem_post for pid(" << comm->pid << ") "
                                             << "on device(" << target_dev_id
                                             << ")\n");
@@ -545,8 +675,8 @@ void sched_mgb_deprecated(void) {
                           << "from device " << tmp_dev_id << "\n");
           BEMPS_SCHED_LOG("Freeing " << tmp_warps_to_free << " warps "
                           << "from device " << tmp_dev_id << "\n");
-          gpu_res_in_use[tmp_dev_id].mem_B += tmp_bytes_to_free;
-          gpu_res_in_use[tmp_dev_id].warps += tmp_warps_to_free;
+          gpus_in_use[tmp_dev_id].mem_B += tmp_bytes_to_free;
+          gpus_in_use[tmp_dev_id].warps += tmp_warps_to_free;
           --*jobs_running_on_gpu;
         } else {
           stats.num_beacons++;
@@ -589,15 +719,15 @@ void sched_mgb_deprecated(void) {
       int target_dev_id = 0;
       for (tmp_dev_id = 0; tmp_dev_id < NUM_GPUS; tmp_dev_id++) {
         BEMPS_SCHED_LOG("Checking device " << tmp_dev_id << "\n"
-                        << "  Total avail bytes: " << GPU_RES[tmp_dev_id].mem_B << "\n"
-                        << "  In-use bytes: " << gpu_res_in_use[tmp_dev_id].mem_B << "\n"
+                        << "  Total avail bytes: " << GPUS[tmp_dev_id].mem_B << "\n"
+                        << "  In-use bytes: " << gpus_in_use[tmp_dev_id].mem_B << "\n"
                         << "  Trying-to-fit bytes: " << comm->beacon.mem_B << "\n"
-                        << "  In-use warps: " << gpu_res_in_use[tmp_dev_id].warps << "\n"
+                        << "  In-use warps: " << gpus_in_use[tmp_dev_id].warps << "\n"
                         << "  Trying-to-add warps: " << comm->beacon.warps << "\n");
-        if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
-             GPU_RES[tmp_dev_id].mem_B)) {
-          if (gpu_res_in_use[tmp_dev_id].warps < curr_min_warps) {
-              curr_min_warps = gpu_res_in_use[tmp_dev_id].warps;
+        if (((gpus_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
+             GPUS[tmp_dev_id].mem_B)) {
+          if (gpus_in_use[tmp_dev_id].warps < curr_min_warps) {
+              curr_min_warps = gpus_in_use[tmp_dev_id].warps;
               target_dev_id = tmp_dev_id;
               assigned = 1;
           }
@@ -620,8 +750,8 @@ void sched_mgb_deprecated(void) {
                         << "to device " << target_dev_id << "\n");
         BEMPS_SCHED_LOG("Adding " << tmp_warps_to_add << " warps "
                         << "to device " << target_dev_id << "\n");
-        gpu_res_in_use[target_dev_id].mem_B += tmp_bytes_to_add;
-        gpu_res_in_use[target_dev_id].warps += tmp_warps_to_add;
+        gpus_in_use[target_dev_id].mem_B += tmp_bytes_to_add;
+        gpus_in_use[target_dev_id].warps += tmp_warps_to_add;
         BEMPS_SCHED_LOG("sem_post for pid(" << comm->pid << ") "
                                             << "on device(" << target_dev_id
                                             << ")\n");
@@ -876,8 +1006,8 @@ void sched_vector(void) {
         BEMPS_SCHED_LOG("Received free-beacon for pid " << comm->pid << "\n");
         tmp_dev_id = comm->sched_notif.device_id;
         // Add (don't subtract), because mem_B is negative already
-        gpu_res_in_use[tmp_dev_id].mem_B += comm->beacon.mem_B;
-        gpu_res_in_use[tmp_dev_id].warps += comm->beacon.warps;
+        gpus_in_use[tmp_dev_id].mem_B += comm->beacon.mem_B;
+        gpus_in_use[tmp_dev_id].warps += comm->beacon.warps;
       } else {
         stats.num_beacons++;
         boomers.push_back(comm);
@@ -911,14 +1041,14 @@ void sched_vector(void) {
       }
 
       for (tmp_dev_id = 0; tmp_dev_id < NUM_GPUS; tmp_dev_id++) {
-        /*if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
-             GPU_RES[tmp_dev_id].mem_B) &&
-            ((gpu_res_in_use[tmp_dev_id].warps + comm->beacon.warps) <
-             GPU_RES[tmp_dev_id].warps)) {*/
-        if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
-             GPU_RES[tmp_dev_id].mem_B)) {
-          gpu_res_in_use[tmp_dev_id].mem_B += comm->beacon.mem_B;
-          gpu_res_in_use[tmp_dev_id].warps += comm->beacon.warps;
+        /*if (((gpus_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
+             GPUS[tmp_dev_id].mem_B) &&
+            ((gpus_in_use[tmp_dev_id].warps + comm->beacon.warps) <
+             GPUS[tmp_dev_id].warps)) {*/
+        if (((gpus_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
+             GPUS[tmp_dev_id].mem_B)) {
+          gpus_in_use[tmp_dev_id].mem_B += comm->beacon.mem_B;
+          gpus_in_use[tmp_dev_id].warps += comm->beacon.warps;
           assigned = 1;
           break;
         }
@@ -987,14 +1117,14 @@ void sched_round_robin(void) {
       }
 
       while (1) {
-        /*if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
-             GPU_RES[tmp_dev_id].mem_B) &&
-            ((gpu_res_in_use[tmp_dev_id].warps + comm->beacon.warps) <
-             GPU_RES[tmp_dev_id].warps)) {*/
-        if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
-             GPU_RES[tmp_dev_id].mem_B)) {
-          gpu_res_in_use[tmp_dev_id].mem_B += comm->beacon.mem_B;
-          gpu_res_in_use[tmp_dev_id].warps += comm->beacon.warps;
+        /*if (((gpus_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
+             GPUS[tmp_dev_id].mem_B) &&
+            ((gpus_in_use[tmp_dev_id].warps + comm->beacon.warps) <
+             GPUS[tmp_dev_id].warps)) {*/
+        if (((gpus_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
+             GPUS[tmp_dev_id].mem_B)) {
+          gpus_in_use[tmp_dev_id].mem_B += comm->beacon.mem_B;
+          gpus_in_use[tmp_dev_id].warps += comm->beacon.warps;
           assigned = 1;
           break;
         }
@@ -1051,8 +1181,8 @@ void sched_round_robin(void) {
         BEMPS_SCHED_LOG("Received free-beacon for pid " << comm->pid << "\n");
         tmp_dev_id = comm->sched_notif.device_id;
         // Add (don't subtract), because mem_B is negative already
-        gpu_res_in_use[tmp_dev_id].mem_B += comm->beacon.mem_B;
-        gpu_res_in_use[tmp_dev_id].warps += comm->beacon.warps;
+        gpus_in_use[tmp_dev_id].mem_B += comm->beacon.mem_B;
+        gpus_in_use[tmp_dev_id].warps += comm->beacon.warps;
       }
 
       *tail_p = (*tail_p + 1) & (BEMPS_BEACON_BUF_SZ - 1);
@@ -1076,14 +1206,14 @@ void sched_round_robin(void) {
       stats.num_beacons++;
 
       while (1) {
-        /*if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
-             GPU_RES[tmp_dev_id].mem_B) &&
-            ((gpu_res_in_use[tmp_dev_id].warps + comm->beacon.warps) <
-             GPU_RES[tmp_dev_id].warps)) {*/
-        if (((gpu_res_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
-             GPU_RES[tmp_dev_id].mem_B)) {
-          gpu_res_in_use[tmp_dev_id].mem_B += comm->beacon.mem_B;
-          gpu_res_in_use[tmp_dev_id].warps += comm->beacon.warps;
+        /*if (((gpus_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
+             GPUS[tmp_dev_id].mem_B) &&
+            ((gpus_in_use[tmp_dev_id].warps + comm->beacon.warps) <
+             GPUS[tmp_dev_id].warps)) {*/
+        if (((gpus_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
+             GPUS[tmp_dev_id].mem_B)) {
+          gpus_in_use[tmp_dev_id].mem_B += comm->beacon.mem_B;
+          gpus_in_use[tmp_dev_id].warps += comm->beacon.warps;
           assigned = 1;
           BEMPS_SCHED_LOG("  assigned\n");
           break;
@@ -1250,6 +1380,17 @@ void parse_args(int argc, char **argv) {
   } else if (strncmp(argv[1], "mgb", 4) == 0) {
     which_scheduler = SCHED_ALG_MGB_E;
     max_batch_size = SCHED_MGB_BATCH_SIZE;
+    for (i = 0; i < NUM_GPUS; i++) {
+      gpus_in_use[i].mem_B = 0;
+      gpus_in_use[i].warps = 0;
+      gpus_in_use[i].curr_sm = 0;
+      gpus_in_use[i].sms.resize(GPUS[i].sms, {
+                                  GPUS[i].thread_blocks_per_sm,
+                                  GPUS[i].warps_per_sm
+                                });
+      gpus_by_mem[i].which_gpu = i;
+      gpus_by_mem[i].mem_B = &gpus_in_use[i].mem_B;
+    }
   } else {
     usage_and_exit(argv[0]);
   }
@@ -1269,7 +1410,7 @@ int main(int argc, char **argv) {
   BEMPS_SCHED_LOG("Initializing shared memory.\n");
   bemps_shm_p = bemps_sched_init(max_batch_size);
 
-  INIT_GPU_RES();
+  INIT_GPUS();
 
   sched();
 
