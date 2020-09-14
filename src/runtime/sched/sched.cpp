@@ -42,7 +42,7 @@
 #define V100_SXM2_SPECS {           \
   .mem_B = 14000L * 1024 * 1024,    \
   .cores = 5120,                    \
-  .sms   = 84,                      \
+  .sms   = 80,                      \
   .thread_blocks_per_sm = 32,       \
   .warps_per_sm         = 64,       \
 }
