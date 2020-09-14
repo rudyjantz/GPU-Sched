@@ -41,7 +41,7 @@
 
 #define V100_SXM2_SPECS {           \
   .mem_B = 14000L * 1024 * 1024,    \
-  .cores = 3584,                    \
+  .cores = 5120,                    \
   .sms   = 84,                      \
   .thread_blocks_per_sm = 32,       \
   .warps_per_sm         = 64,       \
@@ -427,6 +427,21 @@ void release_compute(std::vector<std::pair<int,int>> &sms, bemps_shm_comm_t *com
 
 
 // Our custom scheduler, multi-GPU with beacons
+// This algorithm does the following:
+//   - Finds the GPU with the most available memory and which can also fit
+//     the kernel
+//       -- this becomes a sort. Previously it was not.
+//   - Checks that it can support the compute requirements, as well.
+//   - If it can, it puts the kernel there.
+//   - If it can't, it checks the GPU with next most available memory.
+// There are other ways to do this, e.g.
+// Instead of sorting the boomers based on memory, use some vector weighting
+// technique (b/c now we have warps and thread blocks).
+// Or instead of finding the GPU with the most available memory, use
+// round-robin, and just check that memory, warps, and thread blocks fit.
+// Or instead of stopping after finding the first GPU (with most available
+// memory) that can support the compute requirements, exhaust all of them to
+// find the one that also has the least compute load.
 void sched_mgb(void) {
   int tmp_dev_id;
   int *head_p;
@@ -599,9 +614,8 @@ void sched_mgb(void) {
 }
 
 
-
 // Our custom scheduler, multi-GPU with beacons.
-// XXX deprecrated. This algorithm treated memory as a hard requirement, and
+// XXX deprecated. This algorithm treated memory as a hard requirement, and
 // then just chose the GPU with the fewest current warps. It didn't consider
 // thread blocks. It didn't consider when warp limits might be saturated.
 void sched_mgb_deprecated(void) {
