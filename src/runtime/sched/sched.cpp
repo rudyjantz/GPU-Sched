@@ -350,13 +350,14 @@ int sort_gpu_by_mem_in_use(const void *a_arg, const void *b_arg) {
 }
 
 
-// Eumlate the hardware's round-robin allocation to find the next available
+// Emulate the hardware's round-robin allocation to find the next available
 // streaming multiprocessor
 int get_next_avail_sm(std::vector<std::pair<int, int> > &sms,
                       std::vector<std::pair<int, int> > &rq,
                       int num_warps,
                       int curr_sm) {
 
+  //BEMPS_SCHED_LOG("curr_sm: " << curr_sm << "\n");
   if (sms[curr_sm].first && sms[curr_sm].second >= num_warps) {
     return curr_sm;
   }
@@ -395,11 +396,12 @@ bool allocate_compute(std::vector<std::pair<int,int>> &sms,
   //   occupied warps for that SM
   std::vector<std::pair<int, int>> rq(num_sms, {0, 0});
 
+  //BEMPS_SCHED_LOG("num_thread_blocks: " << num_thread_blocks << "\n");
   while (num_thread_blocks) {
     avail_sm = get_next_avail_sm(sms, rq, num_warps_per_block, *curr_sm);
     if (avail_sm < 0) {
       bemps_stopwatch_end(&sched_stopwatches[SCHED_STOPWATCH_ALLOCATE_COMPUTE_FAIL]);
-      BEMPS_SCHED_LOG("Compute not available for pid: " << comm->pid);
+      BEMPS_SCHED_LOG("Compute not available for pid: " << comm->pid << "\n");
       return false;
     }
     *curr_sm = avail_sm;
@@ -410,7 +412,7 @@ bool allocate_compute(std::vector<std::pair<int,int>> &sms,
 
   // ... all thread blocks have been assigned to an SM.
   // commit the assignments, and update the SMs
-  BEMPS_SCHED_LOG("Committing compute resources for pid: " << comm->pid);
+  BEMPS_SCHED_LOG("Committing compute resources for pid: " << comm->pid << "\n");
   pid_to_sm_assignments[comm->pid] = rq;
 
   for (i = 0; i < num_sms; i++) {
@@ -425,7 +427,7 @@ bool allocate_compute(std::vector<std::pair<int,int>> &sms,
 
 void release_compute(std::vector<std::pair<int,int>> &sms, bemps_shm_comm_t *comm, int num_sms) {
   int i;
-  BEMPS_SCHED_LOG("Freeing compute resources for pid: " << comm->pid);
+  BEMPS_SCHED_LOG("Freeing compute resources for pid: " << comm->pid << "\n");
   std::vector<std::pair<int,int>> &s = pid_to_sm_assignments[comm->pid];
   for (i = 0; i < num_sms; i++) {
     sms[i].first  += s[i].first;
@@ -463,6 +465,7 @@ void sched_mgb(void) {
   struct timespec ts;
   int boomers_len;
   int i;
+  int g;
   bemps_shm_comm_t *comm;
   int batch_size;
   int which_gpu;
@@ -578,10 +581,10 @@ void sched_mgb(void) {
       qsort(gpus_by_mem, NUM_GPUS, sizeof(struct gpu_and_mem_s), sort_gpu_by_mem_in_use);
 
       // Now attempt to assign the process to a GPU.
-      i = 0;
+      g = 0;
       do {
-        assert(*gpus_by_mem[i].mem_B == gpus_in_use[which_gpu].mem_B);
-        which_gpu  = gpus_by_mem[i].which_gpu;
+        which_gpu  = gpus_by_mem[g].which_gpu;
+        assert(*gpus_by_mem[g].mem_B == gpus_in_use[which_gpu].mem_B);
         mem_max    = GPUS[which_gpu].mem_B;
         mem_in_use = gpus_in_use[which_gpu].mem_B;
         mem_to_add = comm->beacon.mem_B;
@@ -598,8 +601,8 @@ void sched_mgb(void) {
             assigned = 1;
             break;
         }
-        i++;
-      } while (i < NUM_GPUS);
+        g++;
+      } while (g < NUM_GPUS);
 
       if (!assigned) {
         // FIXME: need to add stats, and possibly a way to reserve a
@@ -765,18 +768,20 @@ void sched_mgb_simple_compute(void) {
       long curr_min_warps = LONG_MAX;
       int target_dev_id = 0;
       for (tmp_dev_id = 0; tmp_dev_id < NUM_GPUS; tmp_dev_id++) {
-        BEMPS_SCHED_LOG("Checking device " << tmp_dev_id << "\n"
-                        << "  Total avail bytes: " << GPUS[tmp_dev_id].mem_B << "\n"
-                        << "  In-use bytes: " << gpus_in_use[tmp_dev_id].mem_B << "\n"
+        BEMPS_SCHED_LOG("Checking device "           << tmp_dev_id << "\n"
+                        << "  Total avail bytes: "   << GPUS[tmp_dev_id].mem_B << "\n"
+                        << "  In-use bytes: "        << gpus_in_use[tmp_dev_id].mem_B << "\n"
                         << "  Trying-to-fit bytes: " << comm->beacon.mem_B << "\n"
-                        << "  In-use warps: " << gpus_in_use[tmp_dev_id].warps << "\n"
+                        << "  In-use warps: "        << gpus_in_use[tmp_dev_id].warps << "\n"
                         << "  Trying-to-add warps: " << comm->beacon.warps << "\n");
         if (((gpus_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
              GPUS[tmp_dev_id].mem_B)) {
+          BEMPS_SCHED_LOG("fits mem\n");
           if (gpus_in_use[tmp_dev_id].warps < curr_min_warps) {
               curr_min_warps = gpus_in_use[tmp_dev_id].warps;
               target_dev_id = tmp_dev_id;
               assigned = 1;
+              BEMPS_SCHED_LOG("warps are min. target_dev_id set to " << target_dev_id << "\n");
           }
         } else {
             BEMPS_SCHED_LOG("Couldn't fit " << comm->beacon.mem_B << "\n");
@@ -795,11 +800,18 @@ void sched_mgb_simple_compute(void) {
           1.0f
           * (gpus_in_use[target_dev_id].warps + comm->beacon.warps)
           / max_warps;
+        BEMPS_SCHED_LOG("max_tbs: " << max_tbs << "\n");
+        BEMPS_SCHED_LOG("max_warps: " << max_warps << "\n");
+        BEMPS_SCHED_LOG("warp_percentage: " << warp_percentage << "\n");
+        BEMPS_SCHED_LOG("active_jobs: " << gpus_in_use[target_dev_id].active_jobs << "\n");
         if (gpus_in_use[target_dev_id].active_jobs < SCHED_MGB_SIMPLE_COMPUTE_MIN_JOBS) {
+          BEMPS_SCHED_LOG("assigned A\n");
           assigned = 1;
         } else if (warp_percentage < SCHED_MGB_SIMPLE_COMPUTE_THRESHOLD) {
+          BEMPS_SCHED_LOG("assigned B\n");
           assigned = 1;
         } else {
+          BEMPS_SCHED_LOG("unassigned\n");
           assigned = 0;
         }
       }
@@ -828,7 +840,7 @@ void sched_mgb_simple_compute(void) {
         comm->sched_notif.device_id = target_dev_id;
         comm->state = BEMPS_BEACON_STATE_SCHEDULED_E;
         sem_post(&comm->sched_notif.sem);
-        gpus_in_use[tmp_dev_id].active_jobs++;
+        gpus_in_use[target_dev_id].active_jobs++;
         ++*jobs_running_on_gpu;
         --*jobs_waiting_on_gpu;
       }
@@ -1657,6 +1669,8 @@ void parse_args(int argc, char **argv) {
 }
 
 int main(int argc, char **argv) {
+  INIT_GPUS();
+
   BEMPS_SCHED_LOG("BEMPS SCHEDULER\n");
   signal(SIGINT, sigint_handler);
 
@@ -1666,7 +1680,6 @@ int main(int argc, char **argv) {
   BEMPS_SCHED_LOG("Initializing shared memory.\n");
   bemps_shm_p = bemps_sched_init(max_batch_size);
 
-  INIT_GPUS();
 
   sched();
 
