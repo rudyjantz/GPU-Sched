@@ -15,13 +15,13 @@
 #
 
 #BASE_PATH=/home/rudy/wo/gpu
-#BASE_PATH=/home/cc
-BASE_PATH=/home/ubuntu
+BASE_PATH=/home/cc
+#BASE_PATH=/home/ubuntu
 BEMPS_SCHED_PATH=${BASE_PATH}/GPU-Sched/build/runtime/sched
 WORKLOADER_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver
-#WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/test
+WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/test
 #WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ppopp21
-WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ppopp21-volta
+#WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ppopp21-volta
 RESULTS_PATH=results
 
 
@@ -32,6 +32,7 @@ WORKLOADS=(
     #debug_05.wl
     #debug_06.wl
     #debug_07.wl
+    debug_08.wl
     #k80_small_16jobs_0.wl
     #k80_small_16jobs_1.wl
     #k80_medium_16jobs_0.wl
@@ -70,19 +71,19 @@ WORKLOADS=(
     #v100_50_64jobs_0.wl
     #v100_50_128jobs_0.wl
     #v100_50_256jobs_0.wl
-    v100_50_512jobs_0.wl
-    v100_50_1024jobs_0.wl
+    #v100_50_512jobs_0.wl
+    #v100_50_1024jobs_0.wl
 )
 
 SINGLE_ASSIGNMENT_ARGS_ARR=(
     #1
-    #2 # <-- 2-GPU system
-    4 # <-- 4-GPU system
+    2 # <-- 2-GPU system
+    #4 # <-- 4-GPU system
 )
 CG_ARGS_ARR=(
     #2 # <-- Don't use for 4-GPU system. Don't use for 2-GPU system unless sanity checking. This is equivalent to single-assignment.
     #3 # <-- Don't use for 4-GPU system
-    #4 # <-- Don't use for 4-GPU system unless sanity checking. This is equivalent to single-assignment.
+    4 # <-- Don't use for 4-GPU system unless sanity checking. This is equivalent to single-assignment.
     #5
     #6
     #7
@@ -95,11 +96,11 @@ CG_ARGS_ARR=(
 )
 MGB_ARGS_ARR=(
     #6
-    #8
+    8
     #10
     #12
     #14
-    16
+    #16
     #18
     #20
     #24
@@ -109,8 +110,10 @@ MGB_ARGS_ARR=(
 
 
 declare -A SCHED_ALG_TO_ARGS_ARR=(
-    [single-assignment]="SINGLE_ASSIGNMENT_ARGS_ARR"
-    [cg]="CG_ARGS_ARR"
+    #[single-assignment]="SINGLE_ASSIGNMENT_ARGS_ARR"
+    #[cg]="CG_ARGS_ARR"
+    [mgb_basic]="MGB_ARGS_ARR"
+    [mgb_simple_compute]="MGB_ARGS_ARR"
     [mgb]="MGB_ARGS_ARR"
 )
 
