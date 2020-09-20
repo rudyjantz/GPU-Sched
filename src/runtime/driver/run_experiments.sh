@@ -28,11 +28,13 @@ RESULTS_PATH=results
 
 WORKLOADS=(
     #all_jobs_0.wl
+    #all_jobs_1.wl
+    all_jobs_leftover_1.wl
     #debug_02.wl
     #debug_05.wl
     #debug_06.wl
     #debug_07.wl
-    debug_08.wl
+    #debug_08.wl
     #k80_small_16jobs_0.wl
     #k80_small_16jobs_1.wl
     #k80_medium_16jobs_0.wl
@@ -59,6 +61,11 @@ WORKLOADS=(
     #p100_33_32jobs_0.wl
     #p100_50_32jobs_0.wl
     # nvprof versions of _0.wl
+    # assume root b/f getting nvprof number; cc needed it; I believe aws didn't:
+    #   sudo su
+    #   source /home/cc/setenv.sh
+    #   export PATH=/usr/local/cuda-10.1/bin/:$PATH
+    #   ./run_experiments.sh
     #p100_16_16jobs_1.wl
     #p100_25_16jobs_1.wl
     #p100_33_16jobs_1.wl
@@ -96,8 +103,8 @@ CG_ARGS_ARR=(
 )
 MGB_ARGS_ARR=(
     #6
-    8
-    #10
+    #8
+    10
     #12
     #14
     #16
@@ -110,11 +117,11 @@ MGB_ARGS_ARR=(
 
 
 declare -A SCHED_ALG_TO_ARGS_ARR=(
-    #[single-assignment]="SINGLE_ASSIGNMENT_ARGS_ARR"
+    [single-assignment]="SINGLE_ASSIGNMENT_ARGS_ARR"
     #[cg]="CG_ARGS_ARR"
-    [mgb_basic]="MGB_ARGS_ARR"
-    [mgb_simple_compute]="MGB_ARGS_ARR"
-    [mgb]="MGB_ARGS_ARR"
+    #[mgb_basic]="MGB_ARGS_ARR"
+    #[mgb_simple_compute]="MGB_ARGS_ARR"
+    #[mgb]="MGB_ARGS_ARR"
 )
 
 
