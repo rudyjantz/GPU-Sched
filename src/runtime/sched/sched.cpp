@@ -16,7 +16,7 @@
 
 #include "bemps.hpp"
 
-#define BEMPS_SCHED_DEBUG
+//#define BEMPS_SCHED_DEBUG
 
 #define SCHED_DEFAULT_BATCH_SIZE 1
 #define SCHED_VECTOR_BATCH_SIZE 10
@@ -588,9 +588,13 @@ void sched_mgb(void) {
         mem_max    = GPUS[which_gpu].mem_B;
         mem_in_use = gpus_in_use[which_gpu].mem_B;
         mem_to_add = comm->beacon.mem_B;
+        BEMPS_SCHED_LOG("mem_max: "    << mem_max << "\n");
+        BEMPS_SCHED_LOG("mem_in_use: " << mem_in_use << "\n");
+        BEMPS_SCHED_LOG("mem_to_add: " << mem_to_add << "\n");
 
         if ((mem_in_use + mem_to_add) > mem_max) {
-            break;
+          BEMPS_SCHED_LOG("No space available\n");
+          break;
         }
 
         allocated = allocate_compute(gpus_in_use[which_gpu].sms,
@@ -598,8 +602,9 @@ void sched_mgb(void) {
                              GPUS[which_gpu].sms,
                              &gpus_in_use[which_gpu].curr_sm);
         if (allocated) {
-            assigned = 1;
-            break;
+          target_dev_id = which_gpu;
+          assigned = 1;
+          break;
         }
         g++;
       } while (g < NUM_GPUS);
