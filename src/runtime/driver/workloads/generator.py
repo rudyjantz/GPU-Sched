@@ -155,7 +155,7 @@ It must be one of the following values:
   - 33
   - 25
   - 16
-  - small-10
+  - v2-90
   - all
 They carry the following meanings:
   - small: 100% of the jobs are small
