@@ -36,10 +36,10 @@ def usage_and_exit():
 def run_benchmark(cmd, wid, active_jobs):
     with active_jobs.get_lock():
         active_jobs.value += 1
-    proc = subprocess.Popen(cmd,
+    proc = subprocess.Popen(cmd.split(),
                             stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE,
-                            shell=True)
+                            stderr=subprocess.PIPE)
+    print_flush('Worker {}: just launched pid {}'.format(wid, proc.pid))
     o, e = proc.communicate()
     rc = proc.returncode
     if rc != 0:
