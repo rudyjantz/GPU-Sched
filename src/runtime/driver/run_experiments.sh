@@ -19,9 +19,10 @@ BASE_PATH=/home/cc
 #BASE_PATH=/home/ubuntu
 BEMPS_SCHED_PATH=${BASE_PATH}/GPU-Sched/build/runtime/sched
 WORKLOADER_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver
-WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/test
+#WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/test
 #WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ppopp21
 #WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ppopp21-volta
+WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ppopp21-rebuttal
 RESULTS_PATH=results
 
 
@@ -29,7 +30,7 @@ RESULTS_PATH=results
 WORKLOADS=(
     #all_jobs_0.wl
     #all_jobs_1.wl
-    all_jobs_leftover_1.wl
+    #all_jobs_leftover_1.wl
     #debug_02.wl
     #debug_05.wl
     #debug_06.wl
@@ -80,6 +81,9 @@ WORKLOADS=(
     #v100_50_256jobs_0.wl
     #v100_50_512jobs_0.wl
     #v100_50_1024jobs_0.wl
+    # ppopp21 rebuttal WORKLOADS_PATH
+    #p100_v2-90_32jobs_0.wl
+    p100_v2-90_64jobs_0.wl
 )
 
 SINGLE_ASSIGNMENT_ARGS_ARR=(
@@ -104,12 +108,12 @@ CG_ARGS_ARR=(
 MGB_ARGS_ARR=(
     #6
     #8
-    10
+    #10
     #12
     #14
     #16
     #18
-    #20
+    20
     #24
     #24.10 # num procs . max jobs waiting for GPU
     #48.10 # num procs . max jobs waiting for GPU
@@ -117,11 +121,11 @@ MGB_ARGS_ARR=(
 
 
 declare -A SCHED_ALG_TO_ARGS_ARR=(
-    [single-assignment]="SINGLE_ASSIGNMENT_ARGS_ARR"
+    #[single-assignment]="SINGLE_ASSIGNMENT_ARGS_ARR"
     #[cg]="CG_ARGS_ARR"
-    #[mgb_basic]="MGB_ARGS_ARR"
+    [mgb_basic]="MGB_ARGS_ARR"
     #[mgb_simple_compute]="MGB_ARGS_ARR"
-    #[mgb]="MGB_ARGS_ARR"
+    [mgb]="MGB_ARGS_ARR"
 )
 
 
