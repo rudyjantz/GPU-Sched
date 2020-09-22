@@ -16,7 +16,7 @@
 
 #include "bemps.hpp"
 
-//#define BEMPS_SCHED_DEBUG
+#define BEMPS_SCHED_DEBUG
 
 #define SCHED_DEFAULT_BATCH_SIZE 1
 #define SCHED_VECTOR_BATCH_SIZE 10
@@ -370,8 +370,8 @@ int get_next_avail_sm(std::vector<std::pair<int, int> > &sms,
   int num_sms;
   int sm_idx;
 
-  //BEMPS_SCHED_LOG("curr_sm: " << curr_sm << "\n");
   if (sms[curr_sm].first && sms[curr_sm].second >= num_warps) {
+    BEMPS_SCHED_LOG("Quick availability curr_sm: " << curr_sm << "\n");
     return curr_sm;
   }
 
@@ -381,11 +381,13 @@ int get_next_avail_sm(std::vector<std::pair<int, int> > &sms,
   while (sm_idx != curr_sm) {
     if ((sms[sm_idx].first - rq[sm_idx].first) &&
       (sms[sm_idx].second - rq[sm_idx].second) >= num_warps) {
+      BEMPS_SCHED_LOG("Found an available sm_idx: " << sm_idx << "\n");
       return sm_idx;
     }
     sm_idx = (sm_idx + 1) % num_sms;
   }
 
+  BEMPS_SCHED_LOG("No available SM. returning -1\n");
   return -1;
 }
 
@@ -393,11 +395,19 @@ int get_next_avail_sm(std::vector<std::pair<int, int> > &sms,
 bool saturates_compute(struct gpu_s *GPU,
                        bemps_shm_comm_t *comm) {
   if (GPU->total_warps < comm->beacon.warps) {
+    BEMPS_SCHED_LOG("total warps (" << GPU->total_warps << ") "
+                    << "less than beacon warps (" << comm->beacon.warps << "). "
+                    << "Returning true (saturates compute)\n");
     return true;
   }
   if (GPU->total_thread_blocks < comm->beacon.thread_blocks) {
+    BEMPS_SCHED_LOG("total thread blocks (" << GPU->total_thread_blocks << ") "
+                    << "less than beacon thread blocks ("
+                    << comm->beacon.thread_blocks << "). "
+                    << "Returning true (saturates compute)\n");
     return true;
   }
+  BEMPS_SCHED_LOG("Does not saturate compute. returning false\n");
   return false;
 }
 
@@ -422,6 +432,7 @@ bool allocate_compute(struct gpu_s *GPU,
   // the compute units, then don't both with SM assignment. Just mark it as
   // compute-saturated and return true (to say that the GPU should be allocated)
   if (saturates_compute(GPU, comm) && gpu_in_use->active_jobs == 0){
+    BEMPS_SCHED_LOG("Compute would be saturated and there are no active jobs.\n");
     gpu_in_use->compute_saturated = 1;
     return true;
   }
@@ -429,6 +440,7 @@ bool allocate_compute(struct gpu_s *GPU,
   // If the GPU is already compute-saturated, then return false (to say that
   // we can't allocate anything else on it)
   if (gpu_in_use->compute_saturated) {
+    BEMPS_SCHED_LOG("Compute is already saturated\n");
     assert(gpu_in_use->active_jobs == 1);
     return false;
   }
