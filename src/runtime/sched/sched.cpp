@@ -36,6 +36,8 @@
   .num_sms              = 20,       \
   .thread_blocks_per_sm = 32,       \
   .warps_per_sm         = 64,       \
+  .total_thread_blocks  = 20 * 32,  \
+  .total_warps          = 20 * 64   \
 }
 
 #define P100_PCIE_SPECS {           \
@@ -44,6 +46,8 @@
   .num_sms              = 60,       \
   .thread_blocks_per_sm = 32,       \
   .warps_per_sm         = 64,       \
+  .total_thread_blocks  = 60 * 32,  \
+  .total_warps          = 60 * 64   \
 }
 
 #define V100_SXM2_SPECS {           \
@@ -52,6 +56,8 @@
   .num_sms              = 80,       \
   .thread_blocks_per_sm = 32,       \
   .warps_per_sm         = 64,       \
+  .total_thread_blocks  = 80 * 32,  \
+  .total_warps          = 80 * 64   \
 }
 
 
@@ -143,10 +149,13 @@ struct gpu_s {
   unsigned int num_sms;
   unsigned int thread_blocks_per_sm;
   unsigned int warps_per_sm;
+  unsigned int total_thread_blocks;
+  unsigned int total_warps;
 };
 
 struct gpu_in_use_s {
   unsigned int active_jobs;
+  int compute_saturated; // 1 if 1 job saturated the compute units. else 0
   long mem_B; //  mem_B IN USE
   long warps; //  warps IN USE
   int curr_sm; // the next streaming multiprocessor to assign
@@ -243,6 +252,8 @@ static inline void dump_gpu_res(const char *which_env) {
     BEMPS_SCHED_LOG("  num_sms: " << GPUS[i].num_sms << "\n");
     BEMPS_SCHED_LOG("  thread_blocks_per_sm: " << GPUS[i].thread_blocks_per_sm << "\n");
     BEMPS_SCHED_LOG("  warps_per_sm: " << GPUS[i].warps_per_sm << "\n");
+    BEMPS_SCHED_LOG("  total_thread_blocks: " << GPUS[i].total_thread_blocks << "\n");
+    BEMPS_SCHED_LOG("  total_warps: " << GPUS[i].total_warps << "\n");
   }
 }
 
@@ -379,30 +390,58 @@ int get_next_avail_sm(std::vector<std::pair<int, int> > &sms,
 }
 
 
+bool saturates_compute(struct gpu_s *GPU,
+                       bemps_shm_comm_t *comm) {
+  if (GPU->total_warps < comm->beacon.warps) {
+    return true;
+  }
+  if (GPU->total_thread_blocks < comm->beacon.thread_blocks) {
+    return true;
+  }
+  return false;
+}
+
+
 // emulate SM allocation of a GPU device.
-bool allocate_compute(std::vector<std::pair<int,int>> &sms,
-              bemps_shm_comm_t *comm,
-              int num_sms,
-              int *curr_sm) {
+bool allocate_compute(struct gpu_s *GPU,
+                      struct gpu_in_use_s *gpu_in_use,
+                      bemps_shm_comm_t *comm) {
+  std::vector<std::pair<int,int>> &sms = gpu_in_use->sms;
   int num_thread_blocks = comm->beacon.thread_blocks;
   // ignore off-by-one
   int num_warps_per_block = comm->beacon.warps / comm->beacon.thread_blocks;
   int avail_sm;
   int i;
-  int *tmp_curr_sm;
+  int tmp_curr_sm;
 
   bemps_stopwatch_start(&sched_stopwatches[SCHED_STOPWATCH_ALLOCATE_COMPUTE_SUCCESS]);
   bemps_stopwatch_start(&sched_stopwatches[SCHED_STOPWATCH_ALLOCATE_COMPUTE_FAIL]);
 
+
+  // If the GPU has no jobs running on it, and this job would saturate all
+  // the compute units, then don't both with SM assignment. Just mark it as
+  // compute-saturated and return true (to say that the GPU should be allocated)
+  if (saturates_compute(GPU, comm) && gpu_in_use->active_jobs == 0){
+    gpu_in_use->compute_saturated = 1;
+    return true;
+  }
+
+  // If the GPU is already compute-saturated, then return false (to say that
+  // we can't allocate anything else on it)
+  if (gpu_in_use->compute_saturated) {
+    assert(gpu_in_use->active_jobs == 1);
+    return false;
+  }
+
   // A vector of length num_sms. Each element is a pair:
   //   occupied thread blocks for that SM
   //   occupied warps for that SM
-  std::vector<std::pair<int, int>> rq(num_sms, {0, 0});
+  std::vector<std::pair<int, int>> rq(GPU->num_sms, {0, 0});
 
   //BEMPS_SCHED_LOG("num_thread_blocks: " << num_thread_blocks << "\n");
-  *tmp_curr_sm = *curr_sm;
+  tmp_curr_sm = gpu_in_use->curr_sm;
   while (num_thread_blocks) {
-    avail_sm = get_next_avail_sm(sms, rq, num_warps_per_block, *tmp_curr_sm);
+    avail_sm = get_next_avail_sm(sms, rq, num_warps_per_block, tmp_curr_sm);
     if (avail_sm < 0) {
       bemps_stopwatch_end(&sched_stopwatches[SCHED_STOPWATCH_ALLOCATE_COMPUTE_FAIL]);
       BEMPS_SCHED_LOG("Compute not available for pid: " << comm->pid << "\n");
@@ -410,16 +449,16 @@ bool allocate_compute(std::vector<std::pair<int,int>> &sms,
     }
     rq[avail_sm].first  += 1;
     rq[avail_sm].second += num_warps_per_block;
-    *tmp_curr_sm = (avail_sm + 1) % num_sms;
+    tmp_curr_sm = (avail_sm + 1) % GPU->num_sms;
     num_thread_blocks--;
   }
 
   // ... all thread blocks have been assigned to an SM.
   // commit the assignments, and update the SMs
   BEMPS_SCHED_LOG("Committing compute resources for pid: " << comm->pid << "\n");
-  *curr_sm = *tmp_curr_sm;
+  gpu_in_use->curr_sm = tmp_curr_sm;
   pid_to_sm_assignments[comm->pid] = rq;
-  for (i = 0; i < num_sms; i++) {
+  for (i = 0; i < GPU->num_sms; i++) {
     sms[i].first  -= rq[i].first;
     sms[i].second -= rq[i].second;
   }
@@ -429,15 +468,20 @@ bool allocate_compute(std::vector<std::pair<int,int>> &sms,
 }
 
 
-void release_compute(std::vector<std::pair<int,int>> &sms, bemps_shm_comm_t *comm, int num_sms) {
+void release_compute(struct gpu_s *GPU,
+                     struct gpu_in_use_s *gpu_in_use,
+                     bemps_shm_comm_t *comm) {
   int i;
+  std::vector<std::pair<int,int>> &sms = gpu_in_use->sms;
+
   BEMPS_SCHED_LOG("Freeing compute resources for pid: " << comm->pid << "\n");
   std::vector<std::pair<int,int>> &s = pid_to_sm_assignments[comm->pid];
-  for (i = 0; i < num_sms; i++) {
+  for (i = 0; i < GPU->num_sms; i++) {
     sms[i].first  += s[i].first;
     sms[i].second += s[i].second;
   }
   pid_to_sm_assignments.erase(comm->pid);
+  gpu_in_use->compute_saturated = 0;
 }
 
 
@@ -538,7 +582,7 @@ void sched_mgb(void) {
                           << "from device " << tmp_dev_id << "\n");
           gpus_in_use[tmp_dev_id].mem_B += tmp_bytes_to_free;
           gpus_in_use[tmp_dev_id].warps += tmp_warps_to_free;
-          release_compute(gpus_in_use[tmp_dev_id].sms, comm, GPUS[tmp_dev_id].num_sms);
+          release_compute(&GPUS[tmp_dev_id], &gpus_in_use[tmp_dev_id], comm);
           gpus_in_use[tmp_dev_id].active_jobs--;
           --*jobs_running_on_gpu;
         } else {
@@ -601,10 +645,9 @@ void sched_mgb(void) {
           break;
         }
 
-        allocated = allocate_compute(gpus_in_use[which_gpu].sms,
-                             comm,
-                             GPUS[which_gpu].num_sms,
-                             &gpus_in_use[which_gpu].curr_sm);
+        allocated = allocate_compute(&GPUS[which_gpu],
+                                     &gpus_in_use[which_gpu],
+                                     comm);
         if (allocated) {
           target_dev_id = which_gpu;
           assigned = 1;
@@ -801,10 +844,8 @@ void sched_mgb_simple_compute(void) {
       // that the target device is the one with the fewest actie warps. So we
       // only have to check that one to see if it's beneath the threshold.
       if (assigned) {
-        float max_tbs   = 1.0f * GPUS[target_dev_id].thread_blocks_per_sm
-                               * GPUS[target_dev_id].num_sms;
-        float max_warps = 1.0f * GPUS[target_dev_id].warps_per_sm
-                               * GPUS[target_dev_id].num_sms;
+        float max_tbs   = 1.0f * GPUS[target_dev_id].total_thread_blocks;
+        float max_warps = 1.0f * GPUS[target_dev_id].total_warps;
         float warp_percentage =
           1.0f
           * (gpus_in_use[target_dev_id].warps + comm->beacon.warps)
@@ -1658,6 +1699,7 @@ void parse_args(int argc, char **argv) {
     max_batch_size = SCHED_MGB_BATCH_SIZE;
     for (i = 0; i < NUM_GPUS; i++) {
       gpus_in_use[i].active_jobs = 0;
+      gpus_in_use[i].compute_saturated = 0;
       gpus_in_use[i].mem_B = 0;
       gpus_in_use[i].warps = 0;
       gpus_in_use[i].curr_sm = 0;
