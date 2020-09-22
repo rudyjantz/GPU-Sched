@@ -147,10 +147,10 @@ struct gpu_s {
 
 struct gpu_in_use_s {
   unsigned int active_jobs;
-  long mem_B;
-  long warps;
+  long mem_B; //  mem_B IN USE
+  long warps; //  warps IN USE
   int curr_sm; // the next streaming multiprocessor to assign
-  std::vector<std::pair<int, int>> sms; // (thread blocks, warps) on each SM
+  std::vector<std::pair<int, int>> sms; // (thread blocks, warps) STILL AVAILABLE on each SM
 };
 
 struct gpu_and_mem_s {
