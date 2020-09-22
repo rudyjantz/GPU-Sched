@@ -363,14 +363,14 @@ int get_next_avail_sm(std::vector<std::pair<int, int> > &sms,
   }
 
   int num_sms = sms.size();
-  int vheader = (curr_sm + 1) % num_sms;
+  int sm_idx  = (curr_sm + 1) % num_sms;
 
-  while (vheader != curr_sm) {
-    if ((sms[vheader].first - rq[vheader].first) &&
-      (sms[vheader].second - rq[vheader].second) >= num_warps) {
-      return vheader;
+  while (sm_idx != curr_sm) {
+    if ((sms[sm_idx].first - rq[sm_idx].first) &&
+      (sms[sm_idx].second - rq[sm_idx].second) >= num_warps) {
+      return sm_idx;
     }
-    vheader = (vheader + 1) % num_sms;
+    sm_idx = (sm_idx + 1) % num_sms;
   }
 
   return -1;
