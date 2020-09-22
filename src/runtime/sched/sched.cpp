@@ -33,7 +33,7 @@
 #define GTX_1080_SPECS {            \
   .mem_B = 8116L * 1024 * 1024,     \
   .cores = 2560,                    \
-  .sms   = 20,                      \
+  .num_sms              = 20,       \
   .thread_blocks_per_sm = 32,       \
   .warps_per_sm         = 64,       \
 }
@@ -41,7 +41,7 @@
 #define P100_PCIE_SPECS {           \
   .mem_B = 14000L * 1024 * 1024,    \
   .cores = 3584,                    \
-  .sms   = 60,                      \
+  .num_sms              = 60,       \
   .thread_blocks_per_sm = 32,       \
   .warps_per_sm         = 64,       \
 }
@@ -49,7 +49,7 @@
 #define V100_SXM2_SPECS {           \
   .mem_B = 14000L * 1024 * 1024,    \
   .cores = 5120,                    \
-  .sms   = 80,                      \
+  .num_sms              = 80,       \
   .thread_blocks_per_sm = 32,       \
   .warps_per_sm         = 64,       \
 }
@@ -140,7 +140,7 @@ typedef enum {
 struct gpu_s {
   long mem_B;
   unsigned int cores;
-  unsigned int sms;
+  unsigned int num_sms;
   unsigned int thread_blocks_per_sm;
   unsigned int warps_per_sm;
 };
@@ -240,7 +240,7 @@ static inline void dump_gpu_res(const char *which_env) {
     BEMPS_SCHED_LOG("  GPU " << i << "\n");
     BEMPS_SCHED_LOG("  mem_B: " << GPUS[i].mem_B << "\n");
     BEMPS_SCHED_LOG("  cores: " << GPUS[i].cores << "\n");
-    BEMPS_SCHED_LOG("  sms: " << GPUS[i].sms << "\n");
+    BEMPS_SCHED_LOG("  num_sms: " << GPUS[i].num_sms << "\n");
     BEMPS_SCHED_LOG("  thread_blocks_per_sm: " << GPUS[i].thread_blocks_per_sm << "\n");
     BEMPS_SCHED_LOG("  warps_per_sm: " << GPUS[i].warps_per_sm << "\n");
   }
@@ -534,7 +534,7 @@ void sched_mgb(void) {
                           << "from device " << tmp_dev_id << "\n");
           gpus_in_use[tmp_dev_id].mem_B += tmp_bytes_to_free;
           gpus_in_use[tmp_dev_id].warps += tmp_warps_to_free;
-          release_compute(gpus_in_use[tmp_dev_id].sms, comm, GPUS[tmp_dev_id].sms);
+          release_compute(gpus_in_use[tmp_dev_id].sms, comm, GPUS[tmp_dev_id].num_sms);
           gpus_in_use[tmp_dev_id].active_jobs--;
           --*jobs_running_on_gpu;
         } else {
@@ -599,7 +599,7 @@ void sched_mgb(void) {
 
         allocated = allocate_compute(gpus_in_use[which_gpu].sms,
                              comm,
-                             GPUS[which_gpu].sms,
+                             GPUS[which_gpu].num_sms,
                              &gpus_in_use[which_gpu].curr_sm);
         if (allocated) {
           target_dev_id = which_gpu;
@@ -798,9 +798,9 @@ void sched_mgb_simple_compute(void) {
       // only have to check that one to see if it's beneath the threshold.
       if (assigned) {
         float max_tbs   = 1.0f * GPUS[target_dev_id].thread_blocks_per_sm
-                               * GPUS[target_dev_id].sms;
+                               * GPUS[target_dev_id].num_sms;
         float max_warps = 1.0f * GPUS[target_dev_id].warps_per_sm
-                               * GPUS[target_dev_id].sms;
+                               * GPUS[target_dev_id].num_sms;
         float warp_percentage =
           1.0f
           * (gpus_in_use[target_dev_id].warps + comm->beacon.warps)
@@ -1657,7 +1657,7 @@ void parse_args(int argc, char **argv) {
       gpus_in_use[i].mem_B = 0;
       gpus_in_use[i].warps = 0;
       gpus_in_use[i].curr_sm = 0;
-      gpus_in_use[i].sms.resize(GPUS[i].sms, {
+      gpus_in_use[i].sms.resize(GPUS[i].num_sms, {
                                   GPUS[i].thread_blocks_per_sm,
                                   GPUS[i].warps_per_sm
                                 });
