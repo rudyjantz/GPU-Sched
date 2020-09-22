@@ -356,14 +356,16 @@ int get_next_avail_sm(std::vector<std::pair<int, int> > &sms,
                       std::vector<std::pair<int, int> > &rq,
                       int num_warps,
                       int curr_sm) {
+  int num_sms;
+  int sm_idx;
 
   //BEMPS_SCHED_LOG("curr_sm: " << curr_sm << "\n");
   if (sms[curr_sm].first && sms[curr_sm].second >= num_warps) {
     return curr_sm;
   }
 
-  int num_sms = sms.size();
-  int sm_idx  = (curr_sm + 1) % num_sms;
+  num_sms = sms.size();
+  sm_idx  = (curr_sm + 1) % num_sms;
 
   while (sm_idx != curr_sm) {
     if ((sms[sm_idx].first - rq[sm_idx].first) &&
