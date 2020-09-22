@@ -389,6 +389,7 @@ bool allocate_compute(std::vector<std::pair<int,int>> &sms,
   int num_warps_per_block = comm->beacon.warps / comm->beacon.thread_blocks;
   int avail_sm;
   int i;
+  int *tmp_curr_sm;
 
   bemps_stopwatch_start(&sched_stopwatches[SCHED_STOPWATCH_ALLOCATE_COMPUTE_SUCCESS]);
   bemps_stopwatch_start(&sched_stopwatches[SCHED_STOPWATCH_ALLOCATE_COMPUTE_FAIL]);
@@ -399,24 +400,25 @@ bool allocate_compute(std::vector<std::pair<int,int>> &sms,
   std::vector<std::pair<int, int>> rq(num_sms, {0, 0});
 
   //BEMPS_SCHED_LOG("num_thread_blocks: " << num_thread_blocks << "\n");
+  *tmp_curr_sm = *curr_sm;
   while (num_thread_blocks) {
-    avail_sm = get_next_avail_sm(sms, rq, num_warps_per_block, *curr_sm);
+    avail_sm = get_next_avail_sm(sms, rq, num_warps_per_block, *tmp_curr_sm);
     if (avail_sm < 0) {
       bemps_stopwatch_end(&sched_stopwatches[SCHED_STOPWATCH_ALLOCATE_COMPUTE_FAIL]);
       BEMPS_SCHED_LOG("Compute not available for pid: " << comm->pid << "\n");
       return false;
     }
-    *curr_sm = avail_sm;
     rq[avail_sm].first  += 1;
     rq[avail_sm].second += num_warps_per_block;
+    *tmp_curr_sm = (avail_sm + 1) % num_sms;
     num_thread_blocks--;
   }
 
   // ... all thread blocks have been assigned to an SM.
   // commit the assignments, and update the SMs
   BEMPS_SCHED_LOG("Committing compute resources for pid: " << comm->pid << "\n");
+  *curr_sm = *tmp_curr_sm;
   pid_to_sm_assignments[comm->pid] = rq;
-
   for (i = 0; i < num_sms; i++) {
     sms[i].first  -= rq[i].first;
     sms[i].second -= rq[i].second;
