@@ -16,7 +16,7 @@
 
 #include "bemps.hpp"
 
-#define BEMPS_SCHED_DEBUG
+//#define BEMPS_SCHED_DEBUG
 
 #define SCHED_DEFAULT_BATCH_SIZE 1
 #define SCHED_VECTOR_BATCH_SIZE 10
@@ -371,7 +371,7 @@ int get_next_avail_sm(std::vector<std::pair<int, int> > &sms,
   int sm_idx;
 
   if (sms[curr_sm].first && sms[curr_sm].second >= num_warps) {
-    BEMPS_SCHED_LOG("Quick availability curr_sm: " << curr_sm << "\n");
+    //BEMPS_SCHED_LOG("Quick availability curr_sm: " << curr_sm << "\n");
     return curr_sm;
   }
 
@@ -381,13 +381,13 @@ int get_next_avail_sm(std::vector<std::pair<int, int> > &sms,
   while (sm_idx != curr_sm) {
     if ((sms[sm_idx].first - rq[sm_idx].first) &&
       (sms[sm_idx].second - rq[sm_idx].second) >= num_warps) {
-      BEMPS_SCHED_LOG("Found an available sm_idx: " << sm_idx << "\n");
+      //BEMPS_SCHED_LOG("Found an available sm_idx: " << sm_idx << "\n");
       return sm_idx;
     }
     sm_idx = (sm_idx + 1) % num_sms;
   }
 
-  BEMPS_SCHED_LOG("No available SM. returning -1\n");
+  //BEMPS_SCHED_LOG("No available SM. returning -1\n");
   return -1;
 }
 
@@ -486,6 +486,11 @@ void release_compute(struct gpu_s *GPU,
   int i;
   std::vector<std::pair<int,int>> &sms = gpu_in_use->sms;
 
+  if (gpu_in_use->compute_saturated) {
+    gpu_in_use->compute_saturated = 0;
+    return;
+  }
+
   BEMPS_SCHED_LOG("Freeing compute resources for pid: " << comm->pid << "\n");
   std::vector<std::pair<int,int>> &s = pid_to_sm_assignments[comm->pid];
   for (i = 0; i < GPU->num_sms; i++) {
@@ -493,7 +498,6 @@ void release_compute(struct gpu_s *GPU,
     sms[i].second += s[i].second;
   }
   pid_to_sm_assignments.erase(comm->pid);
-  gpu_in_use->compute_saturated = 0;
 }
 
 
