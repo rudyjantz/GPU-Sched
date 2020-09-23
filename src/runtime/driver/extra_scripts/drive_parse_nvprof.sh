@@ -5,19 +5,30 @@ set -e
 
 
 #RESULTS_FLD=../results-nvprof-2020.08.12
-RESULTS_FLD=../results-nvprof-2020.08.13
+#RESULTS_FLD=../results-nvprof-2020.08.13
+#RESULTS_FLD=../results/mgb-nvprof
+RESULTS_FLD=../results/hand-picked/nvprof
 
 
+#NUM_JOBS=(
+#    16jobs
+#    32jobs
+#)
 NUM_JOBS=(
+    8jobs
     16jobs
     32jobs
+    64jobs
 )
 
+#MIXES=(
+#    50
+#    33
+#    25
+#    16
+#)
 MIXES=(
-    50
-    33
-    25
-    16
+    picked
 )
 
 for NJ in ${NUM_JOBS[@]}; do
@@ -32,9 +43,14 @@ for NJ in ${NUM_JOBS[@]}; do
         #  ${RESULTS_FLD}/p100_${MIX}_${NJ}_1.mgb.10.workloader-log \
         #  &> ${NJ}-${MIX}-result.txt
 
+        #./parse_nvprof.py \
+        #  ${RESULTS_FLD}/p100_${MIX}_${NJ}_1.single-assignment.4.workloader-log \
+        #  ${RESULTS_FLD}/p100_${MIX}_${NJ}_1.mgb.16.workloader-log \
+        #  &> ${NJ}-${MIX}-result.txt
+
         ./parse_nvprof.py \
-          ${RESULTS_FLD}/p100_${MIX}_${NJ}_1.single-assignment.4.workloader-log \
-          ${RESULTS_FLD}/p100_${MIX}_${NJ}_1.mgb.16.workloader-log \
+          ${RESULTS_FLD}/hand_${MIX}_${NJ}_2.single-assignment.2.workloader-log \
+          ${RESULTS_FLD}/hand_${MIX}_${NJ}_2.mgb_basic.10.workloader-log \
           &> ${NJ}-${MIX}-result.txt
 
     done
