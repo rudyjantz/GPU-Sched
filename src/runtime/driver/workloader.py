@@ -25,7 +25,7 @@ def usage_and_exit():
     print_flush('Args:')
     print_flush('  num_processes: The number of worker processes for this driver.')
     print_flush('  workload_file: The relative path and name of the .wl workload file.')
-    print_flush('  sched_alg: The scheduling algorithm. One of "single-assignment", "cg", or "mgb".')
+    print_flush('  sched_alg: The scheduling algorithm. One of "single-assignment", "cg", "mgb_basic", "mgb_simple_compute", or "mgb".')
     print()
     print()
     exit(1)
@@ -36,10 +36,10 @@ def usage_and_exit():
 def run_benchmark(cmd, wid, active_jobs):
     with active_jobs.get_lock():
         active_jobs.value += 1
-    proc = subprocess.Popen(cmd,
+    proc = subprocess.Popen(cmd.split(),
                             stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE,
-                            shell=True)
+                            stderr=subprocess.PIPE)
+    print_flush('Worker {}: just launched pid {}'.format(wid, proc.pid))
     o, e = proc.communicate()
     rc = proc.returncode
     if rc != 0:
@@ -186,9 +186,9 @@ if len(sys.argv) != 4:
     usage_and_exit()
 workload_file = sys.argv[1]
 sched_alg     = sys.argv[2]
-if sched_alg not in ['single-assignment', 'cg', 'mgb']:
+if sched_alg not in {'single-assignment', 'cg', 'mgb', 'mgb_basic', 'mgb_simple_compute', 'mgb'}:
     usage_and_exit()
-if sched_alg == 'mgb':
+if sched_alg in {'mgb_basic', 'mgb_simple_compute', 'mgb'}:
     mgb_args = sys.argv[3].split('.')
     if len(mgb_args) == 2:
         max_gpu_waiting_jobs = int(mgb_args[1])

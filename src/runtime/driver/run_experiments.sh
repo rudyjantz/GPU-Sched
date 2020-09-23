@@ -15,23 +15,27 @@
 #
 
 #BASE_PATH=/home/rudy/wo/gpu
-#BASE_PATH=/home/cc
-BASE_PATH=/home/ubuntu
+BASE_PATH=/home/cc
+#BASE_PATH=/home/ubuntu
 BEMPS_SCHED_PATH=${BASE_PATH}/GPU-Sched/build/runtime/sched
 WORKLOADER_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver
 #WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/test
 #WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ppopp21
-WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ppopp21-volta
+#WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ppopp21-volta
+WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ppopp21-rebuttal
 RESULTS_PATH=results
 
 
 
 WORKLOADS=(
     #all_jobs_0.wl
+    #all_jobs_1.wl
+    #all_jobs_leftover_1.wl
     #debug_02.wl
     #debug_05.wl
     #debug_06.wl
     #debug_07.wl
+    #debug_08.wl
     #k80_small_16jobs_0.wl
     #k80_small_16jobs_1.wl
     #k80_medium_16jobs_0.wl
@@ -58,6 +62,11 @@ WORKLOADS=(
     #p100_33_32jobs_0.wl
     #p100_50_32jobs_0.wl
     # nvprof versions of _0.wl
+    # assume root b/f getting nvprof number; cc needed it; I believe aws didn't:
+    #   sudo su
+    #   source /home/cc/setenv.sh
+    #   export PATH=/usr/local/cuda-10.1/bin/:$PATH
+    #   ./run_experiments.sh
     #p100_16_16jobs_1.wl
     #p100_25_16jobs_1.wl
     #p100_33_16jobs_1.wl
@@ -70,19 +79,30 @@ WORKLOADS=(
     #v100_50_64jobs_0.wl
     #v100_50_128jobs_0.wl
     #v100_50_256jobs_0.wl
-    v100_50_512jobs_0.wl
-    v100_50_1024jobs_0.wl
+    #v100_50_512jobs_0.wl
+    #v100_50_1024jobs_0.wl
+    # ppopp21 rebuttal WORKLOADS_PATH
+    #p100_v2-90_32jobs_0.wl # lost the original workload
+    #p100_v2-90_64jobs_0.wl # lost the original workload
+    #hand_picked_8jobs_1.wl # hand-picked _0.wl is starter file, _1.wl is shuffled
+    #hand_picked_16jobs_1.wl
+    #hand_picked_32jobs_1.wl
+    #hand_picked_64jobs_1.wl
+    hand_picked_8jobs_2.wl # _2.wl is with nvprof
+    hand_picked_16jobs_2.wl
+    hand_picked_32jobs_2.wl
+    hand_picked_64jobs_2.wl
 )
 
 SINGLE_ASSIGNMENT_ARGS_ARR=(
     #1
-    #2 # <-- 2-GPU system
-    4 # <-- 4-GPU system
+    2 # <-- 2-GPU system
+    #4 # <-- 4-GPU system
 )
 CG_ARGS_ARR=(
     #2 # <-- Don't use for 4-GPU system. Don't use for 2-GPU system unless sanity checking. This is equivalent to single-assignment.
     #3 # <-- Don't use for 4-GPU system
-    #4 # <-- Don't use for 4-GPU system unless sanity checking. This is equivalent to single-assignment.
+    4 # <-- Don't use for 4-GPU system unless sanity checking. This is equivalent to single-assignment.
     #5
     #6
     #7
@@ -96,10 +116,10 @@ CG_ARGS_ARR=(
 MGB_ARGS_ARR=(
     #6
     #8
-    #10
+    10
     #12
     #14
-    16
+    #16
     #18
     #20
     #24
@@ -110,8 +130,10 @@ MGB_ARGS_ARR=(
 
 declare -A SCHED_ALG_TO_ARGS_ARR=(
     [single-assignment]="SINGLE_ASSIGNMENT_ARGS_ARR"
-    [cg]="CG_ARGS_ARR"
-    [mgb]="MGB_ARGS_ARR"
+    #[cg]="CG_ARGS_ARR"
+    #[mgb_basic]="MGB_ARGS_ARR"
+    #[mgb_simple_compute]="MGB_ARGS_ARR"
+    #[mgb]="MGB_ARGS_ARR"
 )
 
 

@@ -16,7 +16,7 @@
 
 #include "bemps.hpp"
 
-#define BEMPS_SCHED_DEBUG
+//#define BEMPS_SCHED_DEBUG
 
 #define SCHED_DEFAULT_BATCH_SIZE 1
 #define SCHED_VECTOR_BATCH_SIZE 10
@@ -33,25 +33,31 @@
 #define GTX_1080_SPECS {            \
   .mem_B = 8116L * 1024 * 1024,     \
   .cores = 2560,                    \
-  .sms   = 20,                      \
+  .num_sms              = 20,       \
   .thread_blocks_per_sm = 32,       \
   .warps_per_sm         = 64,       \
+  .total_thread_blocks  = 20 * 32,  \
+  .total_warps          = 20 * 64   \
 }
 
 #define P100_PCIE_SPECS {           \
   .mem_B = 14000L * 1024 * 1024,    \
   .cores = 3584,                    \
-  .sms   = 60,                      \
+  .num_sms              = 60,       \
   .thread_blocks_per_sm = 32,       \
   .warps_per_sm         = 64,       \
+  .total_thread_blocks  = 60 * 32,  \
+  .total_warps          = 60 * 64   \
 }
 
 #define V100_SXM2_SPECS {           \
   .mem_B = 14000L * 1024 * 1024,    \
   .cores = 5120,                    \
-  .sms   = 80,                      \
+  .num_sms              = 80,       \
   .thread_blocks_per_sm = 32,       \
   .warps_per_sm         = 64,       \
+  .total_thread_blocks  = 80 * 32,  \
+  .total_warps          = 80 * 64   \
 }
 
 
@@ -140,17 +146,20 @@ typedef enum {
 struct gpu_s {
   long mem_B;
   unsigned int cores;
-  unsigned int sms;
+  unsigned int num_sms;
   unsigned int thread_blocks_per_sm;
   unsigned int warps_per_sm;
+  unsigned int total_thread_blocks;
+  unsigned int total_warps;
 };
 
 struct gpu_in_use_s {
   unsigned int active_jobs;
-  long mem_B;
-  long warps;
+  int compute_saturated; // 1 if 1 job saturated the compute units. else 0
+  long mem_B; //  mem_B IN USE
+  long warps; //  warps IN USE
   int curr_sm; // the next streaming multiprocessor to assign
-  std::vector<std::pair<int, int>> sms; // (thread blocks, warps) on each SM
+  std::vector<std::pair<int, int>> sms; // (thread blocks, warps) STILL AVAILABLE on each SM
 };
 
 struct gpu_and_mem_s {
@@ -240,9 +249,11 @@ static inline void dump_gpu_res(const char *which_env) {
     BEMPS_SCHED_LOG("  GPU " << i << "\n");
     BEMPS_SCHED_LOG("  mem_B: " << GPUS[i].mem_B << "\n");
     BEMPS_SCHED_LOG("  cores: " << GPUS[i].cores << "\n");
-    BEMPS_SCHED_LOG("  sms: " << GPUS[i].sms << "\n");
+    BEMPS_SCHED_LOG("  num_sms: " << GPUS[i].num_sms << "\n");
     BEMPS_SCHED_LOG("  thread_blocks_per_sm: " << GPUS[i].thread_blocks_per_sm << "\n");
     BEMPS_SCHED_LOG("  warps_per_sm: " << GPUS[i].warps_per_sm << "\n");
+    BEMPS_SCHED_LOG("  total_thread_blocks: " << GPUS[i].total_thread_blocks << "\n");
+    BEMPS_SCHED_LOG("  total_warps: " << GPUS[i].total_warps << "\n");
   }
 }
 
@@ -350,70 +361,116 @@ int sort_gpu_by_mem_in_use(const void *a_arg, const void *b_arg) {
 }
 
 
-// Eumlate the hardware's round-robin allocation to find the next available
+// Emulate the hardware's round-robin allocation to find the next available
 // streaming multiprocessor
 int get_next_avail_sm(std::vector<std::pair<int, int> > &sms,
                       std::vector<std::pair<int, int> > &rq,
                       int num_warps,
                       int curr_sm) {
+  int num_sms;
+  int sm_idx;
 
   if (sms[curr_sm].first && sms[curr_sm].second >= num_warps) {
+    //BEMPS_SCHED_LOG("Quick availability curr_sm: " << curr_sm << "\n");
     return curr_sm;
   }
 
-  int num_sms = sms.size();
-  int vheader = (curr_sm + 1) % num_sms;
+  num_sms = sms.size();
+  sm_idx  = (curr_sm + 1) % num_sms;
 
-  while (vheader != curr_sm) {
-    if ((sms[vheader].first - rq[vheader].first) &&
-      (sms[vheader].second - rq[vheader].second) >= num_warps) {
-      return vheader;
+  while (sm_idx != curr_sm) {
+    if ((sms[sm_idx].first - rq[sm_idx].first) &&
+      (sms[sm_idx].second - rq[sm_idx].second) >= num_warps) {
+      //BEMPS_SCHED_LOG("Found an available sm_idx: " << sm_idx << "\n");
+      return sm_idx;
     }
-    vheader = (vheader + 1) % num_sms;
+    sm_idx = (sm_idx + 1) % num_sms;
   }
 
+  //BEMPS_SCHED_LOG("No available SM. returning -1\n");
   return -1;
 }
 
 
+bool saturates_compute(struct gpu_s *GPU,
+                       bemps_shm_comm_t *comm) {
+  if (GPU->total_warps < comm->beacon.warps) {
+    BEMPS_SCHED_LOG("total warps (" << GPU->total_warps << ") "
+                    << "less than beacon warps (" << comm->beacon.warps << "). "
+                    << "Returning true (saturates compute)\n");
+    return true;
+  }
+  if (GPU->total_thread_blocks < comm->beacon.thread_blocks) {
+    BEMPS_SCHED_LOG("total thread blocks (" << GPU->total_thread_blocks << ") "
+                    << "less than beacon thread blocks ("
+                    << comm->beacon.thread_blocks << "). "
+                    << "Returning true (saturates compute)\n");
+    return true;
+  }
+  BEMPS_SCHED_LOG("Does not saturate compute. returning false\n");
+  return false;
+}
+
+
 // emulate SM allocation of a GPU device.
-bool allocate_compute(std::vector<std::pair<int,int>> &sms,
-              bemps_shm_comm_t *comm,
-              int num_sms,
-              int *curr_sm) {
+bool allocate_compute(struct gpu_s *GPU,
+                      struct gpu_in_use_s *gpu_in_use,
+                      bemps_shm_comm_t *comm) {
+  std::vector<std::pair<int,int>> &sms = gpu_in_use->sms;
   int num_thread_blocks = comm->beacon.thread_blocks;
   // ignore off-by-one
   int num_warps_per_block = comm->beacon.warps / comm->beacon.thread_blocks;
   int avail_sm;
   int i;
+  int tmp_curr_sm;
 
   bemps_stopwatch_start(&sched_stopwatches[SCHED_STOPWATCH_ALLOCATE_COMPUTE_SUCCESS]);
   bemps_stopwatch_start(&sched_stopwatches[SCHED_STOPWATCH_ALLOCATE_COMPUTE_FAIL]);
 
+
+  // If the GPU has no jobs running on it, and this job would saturate all
+  // the compute units, then don't both with SM assignment. Just mark it as
+  // compute-saturated and return true (to say that the GPU should be allocated)
+  if (saturates_compute(GPU, comm) && gpu_in_use->active_jobs == 0){
+    BEMPS_SCHED_LOG("Compute would be saturated and there are no active jobs.\n");
+    gpu_in_use->compute_saturated = 1;
+    return true;
+  }
+
+  // If the GPU is already compute-saturated, then return false (to say that
+  // we can't allocate anything else on it)
+  if (gpu_in_use->compute_saturated) {
+    BEMPS_SCHED_LOG("Compute is already saturated\n");
+    assert(gpu_in_use->active_jobs == 1);
+    return false;
+  }
+
   // A vector of length num_sms. Each element is a pair:
   //   occupied thread blocks for that SM
   //   occupied warps for that SM
-  std::vector<std::pair<int, int>> rq(num_sms, {0, 0});
+  std::vector<std::pair<int, int>> rq(GPU->num_sms, {0, 0});
 
+  //BEMPS_SCHED_LOG("num_thread_blocks: " << num_thread_blocks << "\n");
+  tmp_curr_sm = gpu_in_use->curr_sm;
   while (num_thread_blocks) {
-    avail_sm = get_next_avail_sm(sms, rq, num_warps_per_block, *curr_sm);
+    avail_sm = get_next_avail_sm(sms, rq, num_warps_per_block, tmp_curr_sm);
     if (avail_sm < 0) {
       bemps_stopwatch_end(&sched_stopwatches[SCHED_STOPWATCH_ALLOCATE_COMPUTE_FAIL]);
-      BEMPS_SCHED_LOG("Compute not available for pid: " << comm->pid);
+      BEMPS_SCHED_LOG("Compute not available for pid: " << comm->pid << "\n");
       return false;
     }
-    *curr_sm = avail_sm;
     rq[avail_sm].first  += 1;
     rq[avail_sm].second += num_warps_per_block;
+    tmp_curr_sm = (avail_sm + 1) % GPU->num_sms;
     num_thread_blocks--;
   }
 
   // ... all thread blocks have been assigned to an SM.
   // commit the assignments, and update the SMs
-  BEMPS_SCHED_LOG("Committing compute resources for pid: " << comm->pid);
+  BEMPS_SCHED_LOG("Committing compute resources for pid: " << comm->pid << "\n");
+  gpu_in_use->curr_sm = tmp_curr_sm;
   pid_to_sm_assignments[comm->pid] = rq;
-
-  for (i = 0; i < num_sms; i++) {
+  for (i = 0; i < GPU->num_sms; i++) {
     sms[i].first  -= rq[i].first;
     sms[i].second -= rq[i].second;
   }
@@ -423,11 +480,20 @@ bool allocate_compute(std::vector<std::pair<int,int>> &sms,
 }
 
 
-void release_compute(std::vector<std::pair<int,int>> &sms, bemps_shm_comm_t *comm, int num_sms) {
+void release_compute(struct gpu_s *GPU,
+                     struct gpu_in_use_s *gpu_in_use,
+                     bemps_shm_comm_t *comm) {
   int i;
-  BEMPS_SCHED_LOG("Freeing compute resources for pid: " << comm->pid);
+  std::vector<std::pair<int,int>> &sms = gpu_in_use->sms;
+
+  if (gpu_in_use->compute_saturated) {
+    gpu_in_use->compute_saturated = 0;
+    return;
+  }
+
+  BEMPS_SCHED_LOG("Freeing compute resources for pid: " << comm->pid << "\n");
   std::vector<std::pair<int,int>> &s = pid_to_sm_assignments[comm->pid];
-  for (i = 0; i < num_sms; i++) {
+  for (i = 0; i < GPU->num_sms; i++) {
     sms[i].first  += s[i].first;
     sms[i].second += s[i].second;
   }
@@ -463,6 +529,7 @@ void sched_mgb(void) {
   struct timespec ts;
   int boomers_len;
   int i;
+  int g;
   bemps_shm_comm_t *comm;
   int batch_size;
   int which_gpu;
@@ -531,7 +598,7 @@ void sched_mgb(void) {
                           << "from device " << tmp_dev_id << "\n");
           gpus_in_use[tmp_dev_id].mem_B += tmp_bytes_to_free;
           gpus_in_use[tmp_dev_id].warps += tmp_warps_to_free;
-          release_compute(gpus_in_use[tmp_dev_id].sms, comm, GPUS[tmp_dev_id].sms);
+          release_compute(&GPUS[tmp_dev_id], &gpus_in_use[tmp_dev_id], comm);
           gpus_in_use[tmp_dev_id].active_jobs--;
           --*jobs_running_on_gpu;
         } else {
@@ -578,28 +645,32 @@ void sched_mgb(void) {
       qsort(gpus_by_mem, NUM_GPUS, sizeof(struct gpu_and_mem_s), sort_gpu_by_mem_in_use);
 
       // Now attempt to assign the process to a GPU.
-      i = 0;
+      g = 0;
       do {
-        assert(*gpus_by_mem[i].mem_B == gpus_in_use[which_gpu].mem_B);
-        which_gpu  = gpus_by_mem[i].which_gpu;
+        which_gpu  = gpus_by_mem[g].which_gpu;
+        assert(*gpus_by_mem[g].mem_B == gpus_in_use[which_gpu].mem_B);
         mem_max    = GPUS[which_gpu].mem_B;
         mem_in_use = gpus_in_use[which_gpu].mem_B;
         mem_to_add = comm->beacon.mem_B;
+        BEMPS_SCHED_LOG("mem_max: "    << mem_max << "\n");
+        BEMPS_SCHED_LOG("mem_in_use: " << mem_in_use << "\n");
+        BEMPS_SCHED_LOG("mem_to_add: " << mem_to_add << "\n");
 
         if ((mem_in_use + mem_to_add) > mem_max) {
-            break;
+          BEMPS_SCHED_LOG("No space available\n");
+          break;
         }
 
-        allocated = allocate_compute(gpus_in_use[which_gpu].sms,
-                             comm,
-                             GPUS[which_gpu].sms,
-                             &gpus_in_use[which_gpu].curr_sm);
+        allocated = allocate_compute(&GPUS[which_gpu],
+                                     &gpus_in_use[which_gpu],
+                                     comm);
         if (allocated) {
-            assigned = 1;
-            break;
+          target_dev_id = which_gpu;
+          assigned = 1;
+          break;
         }
-        i++;
-      } while (i < NUM_GPUS);
+        g++;
+      } while (g < NUM_GPUS);
 
       if (!assigned) {
         // FIXME: need to add stats, and possibly a way to reserve a
@@ -765,18 +836,20 @@ void sched_mgb_simple_compute(void) {
       long curr_min_warps = LONG_MAX;
       int target_dev_id = 0;
       for (tmp_dev_id = 0; tmp_dev_id < NUM_GPUS; tmp_dev_id++) {
-        BEMPS_SCHED_LOG("Checking device " << tmp_dev_id << "\n"
-                        << "  Total avail bytes: " << GPUS[tmp_dev_id].mem_B << "\n"
-                        << "  In-use bytes: " << gpus_in_use[tmp_dev_id].mem_B << "\n"
+        BEMPS_SCHED_LOG("Checking device "           << tmp_dev_id << "\n"
+                        << "  Total avail bytes: "   << GPUS[tmp_dev_id].mem_B << "\n"
+                        << "  In-use bytes: "        << gpus_in_use[tmp_dev_id].mem_B << "\n"
                         << "  Trying-to-fit bytes: " << comm->beacon.mem_B << "\n"
-                        << "  In-use warps: " << gpus_in_use[tmp_dev_id].warps << "\n"
+                        << "  In-use warps: "        << gpus_in_use[tmp_dev_id].warps << "\n"
                         << "  Trying-to-add warps: " << comm->beacon.warps << "\n");
         if (((gpus_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
              GPUS[tmp_dev_id].mem_B)) {
+          BEMPS_SCHED_LOG("fits mem\n");
           if (gpus_in_use[tmp_dev_id].warps < curr_min_warps) {
               curr_min_warps = gpus_in_use[tmp_dev_id].warps;
               target_dev_id = tmp_dev_id;
               assigned = 1;
+              BEMPS_SCHED_LOG("warps are min. target_dev_id set to " << target_dev_id << "\n");
           }
         } else {
             BEMPS_SCHED_LOG("Couldn't fit " << comm->beacon.mem_B << "\n");
@@ -787,19 +860,24 @@ void sched_mgb_simple_compute(void) {
       // that the target device is the one with the fewest actie warps. So we
       // only have to check that one to see if it's beneath the threshold.
       if (assigned) {
-        float max_tbs   = 1.0f * GPUS[target_dev_id].thread_blocks_per_sm
-                               * GPUS[target_dev_id].sms;
-        float max_warps = 1.0f * GPUS[target_dev_id].warps_per_sm
-                               * GPUS[target_dev_id].sms;
+        float max_tbs   = 1.0f * GPUS[target_dev_id].total_thread_blocks;
+        float max_warps = 1.0f * GPUS[target_dev_id].total_warps;
         float warp_percentage =
           1.0f
           * (gpus_in_use[target_dev_id].warps + comm->beacon.warps)
           / max_warps;
+        BEMPS_SCHED_LOG("max_tbs: " << max_tbs << "\n");
+        BEMPS_SCHED_LOG("max_warps: " << max_warps << "\n");
+        BEMPS_SCHED_LOG("warp_percentage: " << warp_percentage << "\n");
+        BEMPS_SCHED_LOG("active_jobs: " << gpus_in_use[target_dev_id].active_jobs << "\n");
         if (gpus_in_use[target_dev_id].active_jobs < SCHED_MGB_SIMPLE_COMPUTE_MIN_JOBS) {
+          BEMPS_SCHED_LOG("assigned A\n");
           assigned = 1;
         } else if (warp_percentage < SCHED_MGB_SIMPLE_COMPUTE_THRESHOLD) {
+          BEMPS_SCHED_LOG("assigned B\n");
           assigned = 1;
         } else {
+          BEMPS_SCHED_LOG("unassigned\n");
           assigned = 0;
         }
       }
@@ -828,7 +906,7 @@ void sched_mgb_simple_compute(void) {
         comm->sched_notif.device_id = target_dev_id;
         comm->state = BEMPS_BEACON_STATE_SCHEDULED_E;
         sem_post(&comm->sched_notif.sem);
-        gpus_in_use[tmp_dev_id].active_jobs++;
+        gpus_in_use[target_dev_id].active_jobs++;
         ++*jobs_running_on_gpu;
         --*jobs_waiting_on_gpu;
       }
@@ -1637,10 +1715,11 @@ void parse_args(int argc, char **argv) {
     max_batch_size = SCHED_MGB_BATCH_SIZE;
     for (i = 0; i < NUM_GPUS; i++) {
       gpus_in_use[i].active_jobs = 0;
+      gpus_in_use[i].compute_saturated = 0;
       gpus_in_use[i].mem_B = 0;
       gpus_in_use[i].warps = 0;
       gpus_in_use[i].curr_sm = 0;
-      gpus_in_use[i].sms.resize(GPUS[i].sms, {
+      gpus_in_use[i].sms.resize(GPUS[i].num_sms, {
                                   GPUS[i].thread_blocks_per_sm,
                                   GPUS[i].warps_per_sm
                                 });
@@ -1657,6 +1736,8 @@ void parse_args(int argc, char **argv) {
 }
 
 int main(int argc, char **argv) {
+  INIT_GPUS();
+
   BEMPS_SCHED_LOG("BEMPS SCHEDULER\n");
   signal(SIGINT, sigint_handler);
 
@@ -1666,7 +1747,6 @@ int main(int argc, char **argv) {
   BEMPS_SCHED_LOG("Initializing shared memory.\n");
   bemps_shm_p = bemps_sched_init(max_batch_size);
 
-  INIT_GPUS();
 
   sched();
 
