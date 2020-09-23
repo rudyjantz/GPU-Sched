@@ -82,8 +82,16 @@ WORKLOADS=(
     #v100_50_512jobs_0.wl
     #v100_50_1024jobs_0.wl
     # ppopp21 rebuttal WORKLOADS_PATH
-    #p100_v2-90_32jobs_0.wl
-    p100_v2-90_64jobs_0.wl
+    #p100_v2-90_32jobs_0.wl # lost the original workload
+    #p100_v2-90_64jobs_0.wl # lost the original workload
+    #hand_picked_8jobs_1.wl # hand-picked _0.wl is starter file, _1.wl is shuffled
+    #hand_picked_16jobs_1.wl
+    #hand_picked_32jobs_1.wl
+    #hand_picked_64jobs_1.wl
+    hand_picked_8jobs_2.wl # _2.wl is with nvprof
+    hand_picked_16jobs_2.wl
+    hand_picked_32jobs_2.wl
+    hand_picked_64jobs_2.wl
 )
 
 SINGLE_ASSIGNMENT_ARGS_ARR=(
@@ -108,12 +116,12 @@ CG_ARGS_ARR=(
 MGB_ARGS_ARR=(
     #6
     #8
-    #10
+    10
     #12
     #14
     #16
     #18
-    20
+    #20
     #24
     #24.10 # num procs . max jobs waiting for GPU
     #48.10 # num procs . max jobs waiting for GPU
@@ -121,11 +129,11 @@ MGB_ARGS_ARR=(
 
 
 declare -A SCHED_ALG_TO_ARGS_ARR=(
-    #[single-assignment]="SINGLE_ASSIGNMENT_ARGS_ARR"
+    [single-assignment]="SINGLE_ASSIGNMENT_ARGS_ARR"
     #[cg]="CG_ARGS_ARR"
-    [mgb_basic]="MGB_ARGS_ARR"
+    #[mgb_basic]="MGB_ARGS_ARR"
     #[mgb_simple_compute]="MGB_ARGS_ARR"
-    [mgb]="MGB_ARGS_ARR"
+    #[mgb]="MGB_ARGS_ARR"
 )
 
 
