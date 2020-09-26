@@ -28,3 +28,4 @@ Benchmarks/rodinia_cuda_3.1/cuda/nn/hurricane_gen
 Benchmarks/rodinia_cuda_3.1/cuda/nn/nn
 Benchmarks/rodinia_cuda_3.1/cuda/nw/needle
 Benchmarks/rodinia_cuda_3.1/cuda/pathfinder/pathfinder
+results-backup-and-env-help/
