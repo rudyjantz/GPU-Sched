@@ -15,14 +15,15 @@
 #
 
 #BASE_PATH=/home/rudy/wo/gpu
-BASE_PATH=/home/cc
-#BASE_PATH=/home/ubuntu
+#BASE_PATH=/home/cc
+BASE_PATH=/home/ubuntu
 BEMPS_SCHED_PATH=${BASE_PATH}/GPU-Sched/build/runtime/sched
 WORKLOADER_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver
 #WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/test
 #WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ppopp21
 #WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ppopp21-volta
-WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ppopp21-rebuttal
+#WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ppopp21-rebuttal/p100
+WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ppopp21-rebuttal/v100
 RESULTS_PATH=results
 
 
@@ -67,14 +68,22 @@ WORKLOADS=(
     #   source /home/cc/setenv.sh
     #   export PATH=/usr/local/cuda-10.1/bin/:$PATH
     #   ./run_experiments.sh
-    #p100_16_16jobs_1.wl
+    #p100_16_16jobs_1.wl # _1.wl is nvprof on cmds 1, 2, 3, ...
     #p100_25_16jobs_1.wl
     #p100_33_16jobs_1.wl
     #p100_50_16jobs_1.wl
-    #p100_16_32jobs_1.wl
+    #p100_16_32jobs_1.wl # _1.wl has insufficient mem for 32 jobs when using mps
     #p100_25_32jobs_1.wl
     #p100_33_32jobs_1.wl
     #p100_50_32jobs_1.wl
+    #p100_16_32jobs_2.wl # _2.wl is nvprof on cmds 1, 3, 5, ...
+    #p100_16_32jobs_3.wl # _3.wl is nvprof on cmds 2, 4, 6, ...
+    #p100_25_32jobs_2.wl
+    #p100_25_32jobs_3.wl
+    #p100_33_32jobs_2.wl
+    #p100_33_32jobs_3.wl
+    #p100_50_32jobs_2.wl
+    #p100_50_32jobs_3.wl
     # ppopp21 extra last-minute runs
     #v100_50_64jobs_0.wl
     #v100_50_128jobs_0.wl
@@ -84,10 +93,10 @@ WORKLOADS=(
     # ppopp21 rebuttal WORKLOADS_PATH
     #p100_v2-90_32jobs_0.wl # lost the original workload
     #p100_v2-90_64jobs_0.wl # lost the original workload
-    #hand_picked_8jobs_1.wl # hand-picked _0.wl is starter file, _1.wl is shuffled
-    #hand_picked_16jobs_1.wl
-    #hand_picked_32jobs_1.wl
-    #hand_picked_64jobs_1.wl
+    hand_picked_8jobs_1.wl # hand-picked _0.wl is starter file, _1.wl is shuffled
+    hand_picked_16jobs_1.wl
+    hand_picked_32jobs_1.wl
+    hand_picked_64jobs_1.wl
     hand_picked_8jobs_2.wl # _2.wl is with nvprof
     hand_picked_16jobs_2.wl
     hand_picked_32jobs_2.wl
@@ -96,8 +105,8 @@ WORKLOADS=(
 
 SINGLE_ASSIGNMENT_ARGS_ARR=(
     #1
-    2 # <-- 2-GPU system
-    #4 # <-- 4-GPU system
+    #2 # <-- 2-GPU system
+    4 # <-- 4-GPU system
 )
 CG_ARGS_ARR=(
     #2 # <-- Don't use for 4-GPU system. Don't use for 2-GPU system unless sanity checking. This is equivalent to single-assignment.
@@ -116,10 +125,10 @@ CG_ARGS_ARR=(
 MGB_ARGS_ARR=(
     #6
     #8
-    10
+    #10 # <-- ultimately used for ppopp21 2xp100 results
     #12
     #14
-    #16
+    16 # <-- ultimately used for ppopp21 4xv100 results
     #18
     #20
     #24
@@ -133,7 +142,7 @@ declare -A SCHED_ALG_TO_ARGS_ARR=(
     #[cg]="CG_ARGS_ARR"
     #[mgb_basic]="MGB_ARGS_ARR"
     #[mgb_simple_compute]="MGB_ARGS_ARR"
-    #[mgb]="MGB_ARGS_ARR"
+    [mgb]="MGB_ARGS_ARR"
 )
 
 
