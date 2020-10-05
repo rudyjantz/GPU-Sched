@@ -12,7 +12,7 @@ def geomean(xs):
 
 
 #BASE_PATH = '/home/rudy/wo/gpu/bes-gpu/foo/scripts/cc/results-2020.08.01-7.30pm'
-#BASE_PATH = '/home/rudy/wo/gpu/GPU-Sched/src/runtime/driver/results'
+BASE_PATH = '/home/rudy/wo/gpu/GPU-Sched/src/runtime/driver/results'
 #BASE_PATH = '/home/cc/GPU-Sched/src/runtime/driver/results'
 #BASE_PATH = '/home/rudy/wo/gpu/bes-gpu/foo/scripts/cc/results-2020.08.10-10.30am'
 #BASE_PATH = '/home/cc/GPU-Sched/src/runtime/driver/results-2020.08.10-10.30am'
@@ -27,7 +27,7 @@ def geomean(xs):
 #BASE_PATH = '/home/rudy/wo/gpu/GPU-Sched/src/runtime/driver/results/hand-picked/regular'
 
 #BASE_PATH = '/home/rudy/wo/gpu/GPU-Sched/src/runtime/driver/results/regular'
-BASE_PATH = '/home/rudy/wo/gpu/GPU-Sched/src/runtime/driver/results/hand-picked/regular'
+#BASE_PATH = '/home/rudy/wo/gpu/GPU-Sched/src/runtime/driver/results/hand-picked/regular'
 
 SCHED_LOG_SUF  = 'sched-log'
 SCHED_STAT_SUF = 'sched-stats'
@@ -59,10 +59,13 @@ workloads = [
     #'p100_33_32jobs_0',
     #'p100_25_32jobs_0',
     #'p100_16_32jobs_0',
-    'hand_picked_8jobs_1', # CHECK BASE_PATH
-    'hand_picked_16jobs_1',
-    'hand_picked_32jobs_1',
-    'hand_picked_64jobs_1',
+    #'hand_picked_8jobs_1', # CHECK BASE_PATH
+    #'hand_picked_16jobs_1',
+    #'hand_picked_32jobs_1',
+    #'hand_picked_64jobs_1',
+    'v100_50_32jobs_10',
+    'v100_50_64jobs_10',
+    'v100_50_128jobs_10',
 ]
 
 
@@ -302,8 +305,8 @@ for workload in workloads:
     #mgb_filename = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'mgb.6', WRKLDR_LOG_SUF)
 
     sa_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'single-assignment.4', WRKLDR_LOG_SUF)
-    cg_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'mgb_basic.16', WRKLDR_LOG_SUF)
-    mgb_filename = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'mgb.16', WRKLDR_LOG_SUF)
+    cg_filename  = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'mgb_basic.32', WRKLDR_LOG_SUF)
+    mgb_filename = '{}/{}.{}.{}'.format(BASE_PATH, workload, 'mgb.32', WRKLDR_LOG_SUF)
 
     # 16jobs
     #if 'p100_50' in workload:
