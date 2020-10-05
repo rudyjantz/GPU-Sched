@@ -21,9 +21,9 @@ BEMPS_SCHED_PATH=${BASE_PATH}/GPU-Sched/build/runtime/sched
 WORKLOADER_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver
 #WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/test
 #WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ppopp21
-#WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ppopp21-volta
+WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ppopp21-volta
 #WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ppopp21-rebuttal/p100
-WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ppopp21-rebuttal/v100
+#WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ppopp21-rebuttal/v100
 RESULTS_PATH=results
 
 
@@ -93,14 +93,21 @@ WORKLOADS=(
     # ppopp21 rebuttal WORKLOADS_PATH
     #p100_v2-90_32jobs_0.wl # lost the original workload
     #p100_v2-90_64jobs_0.wl # lost the original workload
-    hand_picked_8jobs_1.wl # hand-picked _0.wl is starter file, _1.wl is shuffled
-    hand_picked_16jobs_1.wl
-    hand_picked_32jobs_1.wl
-    hand_picked_64jobs_1.wl
-    hand_picked_8jobs_2.wl # _2.wl is with nvprof
-    hand_picked_16jobs_2.wl
-    hand_picked_32jobs_2.wl
-    hand_picked_64jobs_2.wl
+    #hand_picked_8jobs_1.wl # hand-picked _0.wl is starter file, _1.wl is shuffled
+    #hand_picked_16jobs_1.wl
+    #hand_picked_32jobs_1.wl
+    #hand_picked_64jobs_1.wl
+    #hand_picked_8jobs_2.wl # _2.wl is with nvprof
+    #hand_picked_16jobs_2.wl
+    #hand_picked_32jobs_2.wl
+    #hand_picked_64jobs_2.wl
+    # _10.wl is semi-convenient naming. These are similar to the original _0.wl
+    # files. But now we modified them so no jobs are over 10GB. (sched.cpp
+    # was modified so v100 had 10GB max, as well)
+    v100_50_32jobs_10.wl
+    v100_50_64jobs_10.wl
+    v100_50_128jobs_10.wl
+    #v100_50_256jobs_10.wl
 )
 
 SINGLE_ASSIGNMENT_ARGS_ARR=(
@@ -128,10 +135,11 @@ MGB_ARGS_ARR=(
     #10 # <-- ultimately used for ppopp21 2xp100 results
     #12
     #14
-    16 # <-- ultimately used for ppopp21 4xv100 results
+    #16 # <-- ultimately used for ppopp21 4xv100 results
     #18
     #20
     #24
+    32
     #24.10 # num procs . max jobs waiting for GPU
     #48.10 # num procs . max jobs waiting for GPU
 )
@@ -142,7 +150,7 @@ declare -A SCHED_ALG_TO_ARGS_ARR=(
     #[cg]="CG_ARGS_ARR"
     #[mgb_basic]="MGB_ARGS_ARR"
     #[mgb_simple_compute]="MGB_ARGS_ARR"
-    [mgb]="MGB_ARGS_ARR"
+    #[mgb]="MGB_ARGS_ARR"
 )
 
 
