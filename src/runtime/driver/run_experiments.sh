@@ -104,10 +104,12 @@ WORKLOADS=(
     # _10.wl is semi-convenient naming. These are similar to the original _0.wl
     # files. But now we modified them so no jobs are over 10GB. (sched.cpp
     # was modified so v100 had 10GB max, as well)
-    v100_50_32jobs_10.wl
-    v100_50_64jobs_10.wl
-    v100_50_128jobs_10.wl
-    #v100_50_256jobs_10.wl
+    #v100_50_32jobs_10.wl
+    #v100_50_64jobs_10.wl
+    #v100_50_128jobs_10.wl
+    #v100_50_128jobs_11.wl # nvprof precedes every bmark
+    #v100_50_128jobs_12.wl # nvprof precedes bmarks 1, 3, 5, ...
+    v100_50_128jobs_13.wl # nvprof precedes bmarks 2, 4, 6, ...
 )
 
 SINGLE_ASSIGNMENT_ARGS_ARR=(
@@ -146,11 +148,11 @@ MGB_ARGS_ARR=(
 
 
 declare -A SCHED_ALG_TO_ARGS_ARR=(
-    [single-assignment]="SINGLE_ASSIGNMENT_ARGS_ARR"
+    #[single-assignment]="SINGLE_ASSIGNMENT_ARGS_ARR"
     #[cg]="CG_ARGS_ARR"
     #[mgb_basic]="MGB_ARGS_ARR"
     #[mgb_simple_compute]="MGB_ARGS_ARR"
-    #[mgb]="MGB_ARGS_ARR"
+    [mgb]="MGB_ARGS_ARR"
 )
 
 
