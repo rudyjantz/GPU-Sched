@@ -2,7 +2,7 @@ GPU=1
 CUDNN=0
 OPENCV=0
 OPENMP=0
-DEBUG=0
+DEBUG=1
 
 BEMPS_BUILD_DIR = $(abspath ../../build)
 BEMPS_LIB_DIR = $(BEMPS_BUILD_DIR)/runtime/bemps
@@ -28,7 +28,7 @@ AR=ar
 ARFLAGS=rcs
 # OPTS=-Ofast
 OPTS=
-LDFLAGS= -lm -pthread -L$(LAZY_LIB_DIR) -llazy
+LDFLAGS= -lm -lpthread -L$(LAZY_LIB_DIR) -llazy
 COMMON= -Iinclude/ -Isrc/
 CFLAGS=-Wall -Wno-unused-result -Wno-unknown-pragmas -Wfatal-errors -fPIC
 
