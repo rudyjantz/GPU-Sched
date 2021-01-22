@@ -24,7 +24,11 @@ class WrapperPass : public ModulePass {
   FunctionCallee FreeWrapper;
   FunctionCallee KernelLaunchPrepare;
   FunctionCallee LookUp;
+  FunctionCallee debugSgemm;
+  FunctionCallee debugLoc;
 
+  void createDebugSgemm(Module &M);
+  void createDebugLoc(Module &M);
   void createMallocWrapper(Module &M);
   void createMemcpyWrapper(Module &M);
   void createMemsetWrapper(Module &M);
@@ -43,7 +47,9 @@ class WrapperPass : public ModulePass {
   void replaceMemcpyToSymbol(CallInst *CI);
   void replaceFree(CallInst *CI);
   void addKernelLaunchPrepare(CallInst *CI);
+  void addKernelLaunchPrepareGemm(CallInst *CI);
   void fixKernelParameters(CallInst *CI);
+  void fixCublasSgemmParameters(CallInst *CI);
 
 
  public:

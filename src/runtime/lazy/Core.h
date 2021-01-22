@@ -18,12 +18,13 @@ using namespace std;
 class Runtime {
  private:
   bool issue;  // need to issue an beacon ?
-  map<uint64_t, MObject*> MemObjects;
-  map<uint64_t, std::vector<Operation*>> CudaMemOps;
+  map<uint64_t, MObject*> MemObjects; // this tracks the memobjects pending for creation
+  map<uint64_t, std::vector<Operation*>> CudaMemOps; // the tracks the cuda memory operations for each memobjects
 
   unordered_set<uint64_t> ActiveObjects;
-  map<uint64_t, uint64_t> AllocatedMap;
-  map<uint64_t, uint64_t> ReverseAllocatedMap;
+  map<uint64_t, uint64_t> AllocatedMap; // this tracks the pair of fake_addr to real_addr
+  map<uint64_t, uint64_t> SizeMap; // this tracks the size of each memory object, indexed with fake_addr
+  map<uint64_t, uint64_t> ReverseAllocatedMap; // this tracks the pair of real_addr to fake_addr
   std::vector<Operation*> DeviceDependentOps;
 
  public:
@@ -32,6 +33,7 @@ class Runtime {
   void enableIssue() { issue = true; }
   void disableIssue() { issue = false; }
 
+  bool isWithinAllocatedRegion(void *ptr);
   bool isAllocated(void* ptr);
   void* getValidAddrforFakeAddr(void* ptr);
   void* getValidAddr(void *addr);

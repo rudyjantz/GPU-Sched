@@ -4,10 +4,21 @@
 
 #include "Core.h"
 
+
 static Runtime R;
 static int id = 0;
 
+
+
 extern bool is_fake_addr(void* ptr);
+
+extern "C" void debugSgemm(void *A, void *a, void *B, void *b, void *C, void *c) {
+  fprintf(stdout, "debugSgemm --- A: %p, B: %p, C: %p (a: %p, b: %p, c: %p)\n\n", A, B, C, a, b, c);
+}
+
+extern "C" void debugLoc(char *function, char *kernel) {
+  fprintf(stdout, "debugLoc --- Function: %s, Kernel: %s\n\n", function, kernel);
+}
 
 extern "C" cudaError_t cudaMallocWrapper(void** devPtr, size_t size) {
 #if NOLAZY
@@ -107,9 +118,9 @@ extern "C" cudaError_t cudaKernelLaunchPrepare(uint64_t gxy, int gz,
 
 #if DEBUG
   printf(
-      "\n\nPrepare for a new kernel launch: \n\tgridDim(gx: %d, gy: %d, gz: %d)"
+      "Prepare for a new kernel launch: \n\tgridDim(gx: %d, gy: %d, gz: %d)"
       "\n\tblockDim(bx: %d, by: %d, bz: %d) \n\tmem: %ld, toIssue: %d"
-      "\n Preparing ...\n",
+      "\nPreparing ...\n",
       gx, gy, gz, bx, by, bz, membytes, R.toIssue());
 #endif
 
@@ -118,7 +129,16 @@ extern "C" cudaError_t cudaKernelLaunchPrepare(uint64_t gxy, int gz,
     R.disableIssue();
   }
   cudaError_t err = R.prepare();
-  if (err != cudaSuccess) exit(EXIT_FAILURE);
+
+  if (err != cudaSuccess) {
+#if DEBUG
+    printf("\nPrepare Failed!!!\n\n\n");
+#endif
+    exit(EXIT_FAILURE);
+  }
+#if DEBUG
+  printf("\nPrepare Succeed!!!\n\n\n");
+#endif
   return err;
 }
 
@@ -138,11 +158,11 @@ extern "C" cudaError_t cudaFreeWrapper(void* devPtr) {
 }
 
 extern "C" void * lookup(void * addr) {
+  void * res = R.getValidAddr(addr);
 #if DEBUG
-  printf("\nLookup: %p", addr);
+  printf("\nLookup: %p --> %p\n", addr, res);
 #endif
-
-  return R.getValidAddr(addr);
+  return res;
 }
 
 #endif

@@ -9,28 +9,48 @@ static uint64_t next_fake_addr = 0xffff800000000000;
 
 bool is_fake_addr(void* ptr) { return (uint64_t)ptr >= 0xffff800000000000; }
 
+bool Runtime::isWithinAllocatedRegion(void *ptr) {
+  uint64_t fake_addr = (uint64_t)ptr;
+  auto it = SizeMap.lower_bound(fake_addr);
+  if (it == SizeMap.begin()) return false;
+  it--;
+  return fake_addr > it->first && fake_addr < it->first + it->second;
+}
+
 bool Runtime::isAllocated(void* ptr) {
-  return AllocatedMap.count((uint64_t)(ptr)) > 0;
+  return AllocatedMap.count((uint64_t)(ptr)) || isWithinAllocatedRegion(ptr);
 }
 
 void* Runtime::getValidAddrforFakeAddr(void* ptr) {
   assert(isAllocated(ptr) && "meet an unallocated addr");
   uint64_t fake_addr = (uint64_t)ptr;
-  return (void*)AllocatedMap[fake_addr];
+  uint64_t base = fake_addr;
+  uint64_t offset = 0;
+  if (isWithinAllocatedRegion(ptr)) {
+    auto it = SizeMap.lower_bound(fake_addr);
+    it--;
+    base = it->first;
+    offset = fake_addr - base;
+  }
+  return (void*)(AllocatedMap[base] + offset);
 }
 
 void* Runtime::getValidAddr(void* ptr) {
+  void *res = ptr;
   if (is_fake_addr(ptr)) {
-    assert(isAllocated(ptr) && "lookup meet an unallocated addr, it is impossible");
-    return getValidAddrforFakeAddr(ptr);
+    assert(isAllocated(ptr) && "lookup meet an unallocated fake addr, it is unexpected.\n");
+    res = getValidAddrforFakeAddr(ptr);
   }
-  return ptr;
+  return res;
 }
 
 cudaError_t Runtime::registerMallocOp(void** holder, size_t size) {
-  uint64_t fake_addr = next_fake_addr++;
+  uint64_t fake_addr = next_fake_addr;
   auto* obj = new MObject((void*)fake_addr, size);
   auto* op = new MallocOp(obj);
+  next_fake_addr += size;
+
+  SizeMap[fake_addr] = size;
 
   MemObjects[fake_addr] = obj;
   CudaMemOps[fake_addr].push_back(op);

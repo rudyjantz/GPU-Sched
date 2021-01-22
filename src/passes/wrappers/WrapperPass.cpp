@@ -8,7 +8,24 @@
 
 using namespace llvm;
 
-void WrapperPass::createMallocWrapper(Module &M) {
+void WrapperPass::createDebugSgemm(Module &M) {
+  auto &ctx = M.getContext();
+  Type *paramty = Type::getInt8PtrTy(ctx);
+  Type *retTy = Type::getVoidTy(ctx);
+  FunctionType *FTy = FunctionType::get(retTy, {paramty, paramty, paramty, paramty, paramty, paramty}, false);
+  debugSgemm = M.getOrInsertFunction("debugSgemm", FTy);
+}
+
+void WrapperPass::createDebugLoc(Module &M) {
+  auto &ctx = M.getContext();
+  Type *paramty = Type::getInt8PtrTy(ctx);
+  Type *retTy = Type::getVoidTy(ctx);
+  FunctionType *FTy = FunctionType::get(retTy, {paramty, paramty}, false);
+  debugLoc = M.getOrInsertFunction("debugLoc", FTy);
+}
+
+void WrapperPass::createMallocWrapper(Module &M)
+{
   auto &ctx = M.getContext();
   Type *retTy = Type::getInt32Ty(ctx);
   Type *ptrTy = Type::getInt8PtrTy(ctx)->getPointerTo();
@@ -17,7 +34,8 @@ void WrapperPass::createMallocWrapper(Module &M) {
   MallocWrapper = M.getOrInsertFunction("cudaMallocWrapper", FTy);
 }
 
-void WrapperPass::createMemcpyWrapper(Module &M) {
+void WrapperPass::createMemcpyWrapper(Module &M)
+{
   auto &ctx = M.getContext();
   Type *retTy = Type::getInt32Ty(ctx);
   Type *dstTy = Type::getInt8PtrTy(ctx);
@@ -29,7 +47,8 @@ void WrapperPass::createMemcpyWrapper(Module &M) {
   MemcpyWrapper = M.getOrInsertFunction("cudaMemcpyWrapper", FTy);
 }
 
-void WrapperPass::createMemsetWrapper(Module &M) {
+void WrapperPass::createMemsetWrapper(Module &M)
+{
   auto &ctx = M.getContext();
   Type *retTy = Type::getInt32Ty(ctx);
   Type *dstTy = Type::getInt8PtrTy(ctx);
@@ -39,7 +58,8 @@ void WrapperPass::createMemsetWrapper(Module &M) {
   MemsetWrapper = M.getOrInsertFunction("cudaMemsetWrapper", FTy);
 }
 
-void WrapperPass::createMemcpyToSymbolWrapper(Module &M) {
+void WrapperPass::createMemcpyToSymbolWrapper(Module &M)
+{
   auto &ctx = M.getContext();
   Type *retTy = Type::getInt32Ty(ctx);
   Type *dstTy = Type::getInt8PtrTy(ctx);
@@ -52,7 +72,8 @@ void WrapperPass::createMemcpyToSymbolWrapper(Module &M) {
       M.getOrInsertFunction("cudaMemcpyToSymbolWrapper", FTy);
 }
 
-void WrapperPass::createFreeWrapper(Module &M) {
+void WrapperPass::createFreeWrapper(Module &M)
+{
   auto &ctx = M.getContext();
   Type *retTy = Type::getInt32Ty(ctx);
   Type *ptrTy = Type::getInt8PtrTy(ctx);
@@ -60,7 +81,8 @@ void WrapperPass::createFreeWrapper(Module &M) {
   FreeWrapper = M.getOrInsertFunction("cudaFreeWrapper", FTy);
 }
 
-void WrapperPass::createKernelLaunchPrepare(Module &M) {
+void WrapperPass::createKernelLaunchPrepare(Module &M)
+{
   auto &ctx = M.getContext();
   Type *Int32Ty = Type::getInt32Ty(ctx);
   Type *Int64Ty = Type::getInt64Ty(ctx);
@@ -69,14 +91,16 @@ void WrapperPass::createKernelLaunchPrepare(Module &M) {
   KernelLaunchPrepare = M.getOrInsertFunction("cudaKernelLaunchPrepare", FTy);
 }
 
-void WrapperPass::createLookUp(Module &M) {
+void WrapperPass::createLookUp(Module &M)
+{
   auto &ctx = M.getContext();
   Type *Int8PtrTy = Type::getInt8PtrTy(ctx);
   FunctionType *FTy = FunctionType::get(Int8PtrTy, {Int8PtrTy}, false);
   LookUp = M.getOrInsertFunction("lookup", FTy);
 }
 
-void WrapperPass::replaceMalloc(CallInst *CI) {
+void WrapperPass::replaceMalloc(CallInst *CI)
+{
   dbgs() << "repalcing Malloc : " << *CI << "\n\t" << *CI->getArgOperand(0)
          << "\n\t" << *CI->getArgOperand(1) << "\n\n";
   IRBuilder<NoFolder> IRB(CI->getContext());
@@ -88,7 +112,8 @@ void WrapperPass::replaceMalloc(CallInst *CI) {
   CI->replaceAllUsesWith(ret);
 }
 
-void WrapperPass::replaceMemcpy(CallInst *CI) {
+void WrapperPass::replaceMemcpy(CallInst *CI)
+{
   dbgs() << "repalcing Memcpy : " << *CI << "\n\t" << *CI->getArgOperand(0)
          << "\n\t" << *CI->getArgOperand(1) << "\n\t" << *CI->getArgOperand(2)
          << "\n\t" << *CI->getArgOperand(3) << "\n\n";
@@ -103,7 +128,8 @@ void WrapperPass::replaceMemcpy(CallInst *CI) {
   CI->replaceAllUsesWith(ret);
 }
 
-void WrapperPass::replaceMemset(CallInst *CI) {
+void WrapperPass::replaceMemset(CallInst *CI)
+{
   dbgs() << "repalcing Memset : " << *CI << "\n\t" << *CI->getArgOperand(0)
          << "\n\t" << *CI->getArgOperand(1) << "\n\t" << *CI->getArgOperand(2)
          << "\n\n";
@@ -117,7 +143,8 @@ void WrapperPass::replaceMemset(CallInst *CI) {
   CI->replaceAllUsesWith(ret);
 }
 
-void WrapperPass::replaceMemcpyToSymbol(CallInst *CI) {
+void WrapperPass::replaceMemcpyToSymbol(CallInst *CI)
+{
   dbgs() << "repalcing MemcpyToSymbol : " << *CI << "\n\t"
          << *CI->getArgOperand(0) << "\n\t" << *CI->getArgOperand(1) << "\n\t"
          << *CI->getArgOperand(2) << "\n\t" << *CI->getArgOperand(3) << "\n\n";
@@ -133,7 +160,8 @@ void WrapperPass::replaceMemcpyToSymbol(CallInst *CI) {
   CI->replaceAllUsesWith(ret);
 }
 
-void WrapperPass::replaceFree(CallInst *CI) {
+void WrapperPass::replaceFree(CallInst *CI)
+{
   dbgs() << "repalcing Free : " << *CI << "\n\t" << *CI->getArgOperand(0)
          << "\n\n";
   IRBuilder<NoFolder> IRB(CI->getContext());
@@ -144,12 +172,33 @@ void WrapperPass::replaceFree(CallInst *CI) {
   CI->replaceAllUsesWith(ret);
 }
 
-void WrapperPass::addKernelLaunchPrepare(CallInst *CI) {
+void WrapperPass::addKernelLaunchPrepare(CallInst *CI)
+{
   dbgs() << "adding LaunchPrepare : " << *CI << "\n\t" << *CI->getArgOperand(0)
          << "\n\t" << *CI->getArgOperand(1) << "\n\t" << *CI->getArgOperand(2)
          << "\n\t" << *CI->getArgOperand(3) << "\n\n";
-  IRBuilder<NoFolder> IRB(CI->getContext());
+
+  CallInst *Invoke = getKernelInvokeInst(CI);
+
+  auto &ctx = CI->getContext();
+  IRBuilder<NoFolder> IRB(ctx);
   IRB.SetInsertPoint(CI);
+
+  // Type *Int64Ty = Type::getInt64Ty(ctx);
+  // Constant *FuncName = ConstantDataArray::getString(ctx, CI->getFunction()->getName(), true);
+  // Constant *KernelName = ConstantDataArray::getString(ctx, Invoke->getName(), true);
+
+  // Module *M = CI->getModule();
+
+  // GlobalVariable *F = new GlobalVariable(*M, FuncName->getType(), true, GlobalValue::PrivateLinkage, FuncName);
+  // GlobalVariable *K = new GlobalVariable(*M, KernelName->getType(), true, GlobalValue::PrivateLinkage, KernelName);
+
+  // Constant *idx = ConstantInt::get(Int64Ty, 0, true);
+  // Value * Fb = IRB.CreateGEP(F, {idx, idx});
+  // Value * Kb = IRB.CreateGEP(K, {idx, idx});
+
+  // IRB.CreateCall(debugLoc, {Fb, Kb});
+
   SmallVector<Value *, 4> args;
   args.push_back(CI->getArgOperand(0));
   args.push_back(CI->getArgOperand(1));
@@ -158,7 +207,27 @@ void WrapperPass::addKernelLaunchPrepare(CallInst *CI) {
   IRB.CreateCall(KernelLaunchPrepare, args);
 }
 
-void WrapperPass::fixKernelParameters(CallInst *cudaPush) {
+void WrapperPass::addKernelLaunchPrepareGemm(CallInst *CI)
+{
+  dbgs() << "adding LaunchPrepare for GEMM: " << *CI << "\n";
+  auto &ctx = CI->getContext();
+  Type *Int32Ty = Type::getInt32Ty(ctx);
+  Type *Int64Ty = Type::getInt64Ty(ctx);
+  IRBuilder<NoFolder> IRB(ctx);
+
+  IRB.SetInsertPoint(CI);
+  SmallVector<Value *, 4> args;
+
+  args.push_back(ConstantInt::get(Int64Ty, 0, true));
+  args.push_back(ConstantInt::get(Int32Ty, 0, true));
+  args.push_back(ConstantInt::get(Int64Ty, 0, true));
+  args.push_back(ConstantInt::get(Int32Ty, 0, true));
+
+  IRB.CreateCall(KernelLaunchPrepare, args);
+}
+
+void WrapperPass::fixKernelParameters(CallInst *cudaPush)
+{
   CallInst *Invoke = getKernelInvokeInst(cudaPush);
   assert(Invoke);
 
@@ -168,9 +237,11 @@ void WrapperPass::fixKernelParameters(CallInst *cudaPush) {
 
   dbgs() << "Kernel Invoke: " << *Invoke;
 
-  for (int i = 0; i < Invoke->getNumArgOperands(); i++) {
+  for (int i = 0; i < Invoke->getNumArgOperands(); i++)
+  {
     auto arg = Invoke->getArgOperand(i);
-    if (arg->getType()->isPointerTy()) {
+    if (arg->getType()->isPointerTy())
+    {
       SmallVector<Value *, 1> ops;
       auto tmp = IRB.CreateBitCast(arg, Type::getInt8PtrTy(ctx));
       ops.push_back(tmp);
@@ -185,25 +256,64 @@ void WrapperPass::fixKernelParameters(CallInst *cudaPush) {
   Invoke->getParent()->dump();
 }
 
-CallInst *WrapperPass::getKernelInvokeInst(CallInst *cudaPush) {
+void WrapperPass::fixCublasSgemmParameters(CallInst *cublasSgemm)
+{
+  auto &ctx = cublasSgemm->getContext();
+  IRBuilder<NoFolder> IRB(ctx);
+  IRB.SetInsertPoint(cublasSgemm);
+
+  SmallVector<int, 3> params = {7, 9, 12};
+  // the 7th, 9th, and 12nd params of cublaSgemm refers to GPU memory
+
+  // SmallVector<Value *, 6> DbgSgemmParams;
+
+  for (auto i : params)
+  {
+    SmallVector<Value *, 1> ops;
+    auto arg = cublasSgemm->getArgOperand(i);
+    auto tmp = IRB.CreateBitCast(arg, Type::getInt8PtrTy(ctx));
+    ops.push_back(tmp);
+    Value *lookup = IRB.CreateCall(LookUp, ops);
+    // DbgSgemmParams.push_back(tmp);
+    // DbgSgemmParams.push_back(lookup);
+    dbgs() << "\n\tfix sgemm[" << i << "]: " << *arg << " ---> " << *tmp << "\n";
+    if (lookup->getType() != arg->getType())
+      lookup = IRB.CreateBitCast(lookup, arg->getType());
+    cublasSgemm->replaceUsesOfWith(arg, lookup);
+  }
+  // IRB.CreateCall(debugSgemm, DbgSgemmParams);
+}
+
+CallInst *WrapperPass::getKernelInvokeInst(CallInst *cudaPush)
+{
   int idx = 0;
   Instruction *tmp = cudaPush->getNextNonDebugInstruction();
 
-  while (!isa<CallInst>(tmp)) {
-    if (isa<BranchInst>(tmp)) {
+  while (!isa<CallInst>(tmp))
+  {
+    if (isa<BranchInst>(tmp))
+    {
       tmp = dyn_cast<BranchInst>(tmp)->getSuccessor(idx)->getFirstNonPHIOrDbg();
-    } else if (auto Cmp = dyn_cast<CmpInst>(tmp)) {
+    }
+    else if (auto Cmp = dyn_cast<CmpInst>(tmp))
+    {
       idx = 1 - Cmp->isTrueWhenEqual();
       tmp = tmp->getNextNonDebugInstruction();
-    } else {
+    }
+    else
+    {
       tmp = tmp->getNextNonDebugInstruction();
     }
   }
   return dyn_cast<CallInst>(tmp);
 }
 
-bool WrapperPass::doInitialization(Module &M) {
+bool WrapperPass::doInitialization(Module &M)
+{
   auto &ctx = M.getContext();
+
+  createDebugSgemm(M);
+  createDebugLoc(M);
 
   // declare cudaMallocWrapper
   createMallocWrapper(M);
@@ -221,45 +331,73 @@ bool WrapperPass::doInitialization(Module &M) {
   return true;
 }
 
-bool WrapperPass::runOnModule(Module &M) {
+bool WrapperPass::runOnModule(Module &M)
+{
   Module::FunctionListType &Funcs = M.getFunctionList();
-  for (auto ft = Funcs.begin(); ft != Funcs.end(); ft++) {
+  for (auto ft = Funcs.begin(); ft != Funcs.end(); ft++)
+  {;
     Function &F = *ft;
-    if (F.isIntrinsic() || F.isDeclaration()) continue;
+    if (F.isIntrinsic() || F.isDeclaration())
+      continue;
 
     SmallVector<CallInst *, 4> ToBeRemoved;
-    for (auto it = inst_begin(F); it != inst_end(F); it++) {
+    for (auto it = inst_begin(F); it != inst_end(F); it++)
+    {
       Instruction *I = &*it;
       auto CI = dyn_cast<CallInst>(I);
 
-      if (!CI) continue;
+      if (!CI)
+        continue;
 
       auto Callee = CI->getCalledFunction();
-      if (!Callee) continue;
+      if (!Callee)
+        continue;
 
       auto name = Callee->getName();
 
-      if (name == "cudaMalloc") {
+      if (name == "cudaMalloc")
+      {
         replaceMalloc(CI);
         ToBeRemoved.push_back(CI);
-      } else if (name == "cudaMemcpy") {
+      }
+      else if (name == "cudaMemcpy")
+      {
         replaceMemcpy(CI);
         ToBeRemoved.push_back(CI);
-      } else if (name == "cudaMemcpyToSymbol") {
+      }
+      else if (name == "cudaMemcpyToSymbol")
+      {
         replaceMemcpyToSymbol(CI);
         ToBeRemoved.push_back(CI);
-      } else if (name == "cudaMemset") {
+      }
+      else if (name == "cudaMemset")
+      {
         replaceMemset(CI);
         ToBeRemoved.push_back(CI);
-      } else if (name == "cudaFree") {
+      }
+      else if (name == "cudaFree")
+      {
         replaceFree(CI);
         ToBeRemoved.push_back(CI);
-      } else if (name == "__cudaPushCallConfiguration") {
+      }
+      else if (name == "__cudaPushCallConfiguration")
+      {
         addKernelLaunchPrepare(CI);
         fixKernelParameters(CI);
       }
+      else if (name == "cublasSgemm_v2")
+      {
+        addKernelLaunchPrepareGemm(CI);
+        fixCublasSgemmParameters(CI);
+      }
+      else if (name.startswith("cublas") && name != "cublasCreate_v2")
+      {
+        dbgs() << "Unhandled CUBLAS Call: " << *CI;
+        llvm_unreachable("Unreachable point");
+      }
     }
-    for (auto CI : ToBeRemoved) CI->eraseFromParent();
+    for (auto CI : ToBeRemoved)
+      CI->eraseFromParent();
   }
   return true;
 }
@@ -272,7 +410,8 @@ static RegisterPass<WrapperPass> X("WP", "WrapperPass", false, false);
 #else
 
 static void registerWP(const PassManagerBuilder &,
-                       legacy::PassManagerBase &PM) {
+                       legacy::PassManagerBase &PM)
+{
   PM.add(new WrapperPass());
 }
 
