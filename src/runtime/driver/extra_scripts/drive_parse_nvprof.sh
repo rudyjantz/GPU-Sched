@@ -84,9 +84,16 @@ for NJ in ${NUM_JOBS[@]}; do
         #  ${RESULTS_FLD}/v100_${MIX}_${NJ}_14.mgb_basic.32.workloader-log \
         #  &> ${NJ}-${MIX}-result.txt
 
-        ./parse_nvprof.py \
+        #./parse_nvprof.py \
+        #  ${RESULTS_FLD}/v100_${MIX}_${NJ}_11.single-assignment.4.workloader-log \
+        #  ${RESULTS_FLD}/v100_${MIX}_${NJ}_14.mgb.32.workloader-log \
+        #  &> ${NJ}-${MIX}-result.txt
+
+
+
+        ./parse_nvprof_utilization.py \
           ${RESULTS_FLD}/v100_${MIX}_${NJ}_11.single-assignment.4.workloader-log \
-          ${RESULTS_FLD}/v100_${MIX}_${NJ}_14.mgb.32.workloader-log \
+          ${RESULTS_FLD}/v100_${MIX}_${NJ}_12.mgb_basic.32.workloader-log \
           &> ${NJ}-${MIX}-result.txt
 
 
