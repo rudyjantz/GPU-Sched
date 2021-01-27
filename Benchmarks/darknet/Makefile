@@ -10,7 +10,7 @@ WRAPPER_PASS = $(BEMPS_BUILD_DIR)/passes/wrappers/libWrapperPass.so
 LAZY_LIB_DIR = $(BEMPS_BUILD_DIR)/runtime/lazy
 
 
-ARCH= -gencode arch=compute_60,code=sm_60
+ARCH= -gencode arch=compute_70,code=sm_70
 
 # This is what I use, uncomment if you know your arch and want to specify
 # ARCH= -gencode arch=compute_52,code=compute_52
