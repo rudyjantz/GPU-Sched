@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
+#include <assert.h>
 
 // #include <bemps/bemps.hpp>
 #include <iostream>
@@ -18,6 +19,12 @@
 #include "bemps.hpp"
 
 //#define BEMPS_DEBUG
+#define BEMPS_DARKNET
+
+#ifdef BEMPS_DARKNET
+int bemps_tid_darknet = -1;
+#endif
+
 
 #ifdef BEMPS_DEBUG
 #define BEMPS_LOG(str)                                                 \
@@ -327,6 +334,17 @@ void bemps_beacon(int bemps_tid, bemps_beacon_t *beacon) {
   _wait_for_sched(comm);
 
   _set_device(comm->sched_notif.device_id);
+
+#ifdef BEMPS_DARKNET
+    // Asserting this is the only darknet bemps-tid. If we have more than one,
+    // then we could just push these into a vector and later pop at exit and
+    // free. But that would mean we have more than one bemps-beacon with
+    // no free inbetween, and I don't know yet if that breaks other
+    // assumptions.  So for now, if we hit that case, assert, so I can
+    // investigate.
+    assert(bemps_tid_darknet == -1 && "only supporting 1 beacon in darknet atm");
+    bemps_tid_darknet = bemps_tid;
+#endif
 }
 /** a simple wrapper to bemps_beacon
  * added by Chao
@@ -401,9 +419,9 @@ void bemps_free(int bemps_tid) {
   bemps_tid_to_q_idx.erase(bemps_tid);
   _reset_comm(comm);
 
-  BEMPS_LOG("pid " << pid << " , "
-          << "freeing device_id " << device_id << " , "
-          << "bemps_tid " << bemps_tid << "\n");
+  BEMPS_STATS_LOG("pid " << pid << " , "
+                  << "freeing device_id " << device_id << " , "
+                  << "bemps_tid " << bemps_tid << "\n");
 
   //
   // Notify the scheduler of the resources that have freed up.
@@ -443,6 +461,12 @@ void _send_beacon_at_exit(void) {
   BEMPS_LOG("pid(" << pid << ") "
                    << "setting exit_flag to 1"
                    << "\n");
+
+#ifdef BEMPS_DARKNET
+    // Runtime workaround for missing free beacon. Ought to happen
+    // at exit for our workloads anyways, so it's ok to put it here.
+    bemps_free(bemps_tid_darknet);
+#endif
 
   exit_beacon_q_idx = _inc_head(&bemps_shm.gen->beacon_q_head);
   comm = &bemps_shm.comm[exit_beacon_q_idx];
