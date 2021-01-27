@@ -36,9 +36,19 @@ def usage_and_exit():
 def run_benchmark(cmd, wid, active_jobs):
     with active_jobs.get_lock():
         active_jobs.value += 1
-    proc = subprocess.Popen(cmd.split(),
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE)
+    # hack for darknet workloads. not sure, but i think using the shell=True
+    # for old workloads may not be right, so using this only for the 2 cases
+    # where it was needed (where we cat the names of image files to the darknet
+    # command)
+    if "cat" in cmd and "image-names" in cmd:
+        proc = subprocess.Popen(cmd,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE,
+                                shell=True)
+    else:
+        proc = subprocess.Popen(cmd.split(),
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
     print_flush('Worker {}: just launched pid {}'.format(wid, proc.pid))
     o, e = proc.communicate()
     rc = proc.returncode
