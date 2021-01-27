@@ -14,14 +14,14 @@
 #       Move scheduler results to results folder
 #
 
-#BASE_PATH=/home/rudy/wo/gpu
+BASE_PATH=/home/rudy/wo/gpu
 #BASE_PATH=/home/cc
-BASE_PATH=/home/ubuntu
+#BASE_PATH=/home/ubuntu
 BEMPS_SCHED_PATH=${BASE_PATH}/GPU-Sched/build/runtime/sched
 WORKLOADER_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver
-#WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/test
+WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/test
 #WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ppopp21
-WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ppopp21-volta
+#WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ppopp21-volta
 #WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ppopp21-rebuttal/p100
 #WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ppopp21-rebuttal/v100
 RESULTS_PATH=results
@@ -37,6 +37,10 @@ WORKLOADS=(
     #debug_06.wl
     #debug_07.wl
     #debug_08.wl
+    debug_09.wl
+    #debug_10.wl
+    #debug_11.wl
+    #debug_12.wl
     #k80_small_16jobs_0.wl
     #k80_small_16jobs_1.wl
     #k80_medium_16jobs_0.wl
@@ -109,13 +113,13 @@ WORKLOADS=(
     #v100_50_128jobs_10.wl
     #v100_50_128jobs_11.wl # nvprof precedes every bmark
     #v100_50_128jobs_12.wl # nvprof precedes bmarks 1, 3, 5, ...
-    v100_50_128jobs_13.wl # nvprof precedes bmarks 2, 4, 6, ...
+    #v100_50_128jobs_13.wl # nvprof precedes bmarks 2, 4, 6, ...
 )
 
 SINGLE_ASSIGNMENT_ARGS_ARR=(
-    #1
+    1
     #2 # <-- 2-GPU system
-    4 # <-- 4-GPU system
+    #4 # <-- 4-GPU system
 )
 CG_ARGS_ARR=(
     #2 # <-- Don't use for 4-GPU system. Don't use for 2-GPU system unless sanity checking. This is equivalent to single-assignment.
@@ -133,7 +137,7 @@ CG_ARGS_ARR=(
 )
 MGB_ARGS_ARR=(
     #6
-    #8
+    8
     #10 # <-- ultimately used for ppopp21 2xp100 results
     #12
     #14
@@ -141,18 +145,18 @@ MGB_ARGS_ARR=(
     #18
     #20
     #24
-    32
+    #32
     #24.10 # num procs . max jobs waiting for GPU
     #48.10 # num procs . max jobs waiting for GPU
 )
 
 
 declare -A SCHED_ALG_TO_ARGS_ARR=(
-    #[single-assignment]="SINGLE_ASSIGNMENT_ARGS_ARR"
+    [single-assignment]="SINGLE_ASSIGNMENT_ARGS_ARR"
     #[cg]="CG_ARGS_ARR"
     #[mgb_basic]="MGB_ARGS_ARR"
     #[mgb_simple_compute]="MGB_ARGS_ARR"
-    [mgb]="MGB_ARGS_ARR"
+    #[mgb]="MGB_ARGS_ARR"
 )
 
 
