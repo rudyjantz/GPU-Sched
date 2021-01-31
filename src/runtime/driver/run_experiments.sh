@@ -14,16 +14,17 @@
 #       Move scheduler results to results folder
 #
 
-BASE_PATH=/home/rudy/wo/gpu
+#BASE_PATH=/home/rudy/wo/gpu
 #BASE_PATH=/home/cc
-#BASE_PATH=/home/ubuntu
+BASE_PATH=/home/ubuntu
 BEMPS_SCHED_PATH=${BASE_PATH}/GPU-Sched/build/runtime/sched
 WORKLOADER_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver
-WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/test
+#WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/test
 #WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ppopp21
 #WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ppopp21-volta
 #WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ppopp21-rebuttal/p100
 #WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ppopp21-rebuttal/v100
+WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ics21-volta
 RESULTS_PATH=results
 
 
@@ -37,10 +38,15 @@ WORKLOADS=(
     #debug_06.wl
     #debug_07.wl
     #debug_08.wl
-    debug_09.wl
+    #debug_09.wl
     #debug_10.wl
     #debug_11.wl
     #debug_12.wl
+    #debug_13.wl
+    #debug_14.wl
+    #debug_15.wl
+    #debug_16.wl
+    #debug_17.wl
     #k80_small_16jobs_0.wl
     #k80_small_16jobs_1.wl
     #k80_medium_16jobs_0.wl
@@ -114,17 +120,51 @@ WORKLOADS=(
     #v100_50_128jobs_11.wl # nvprof precedes every bmark
     #v100_50_128jobs_12.wl # nvprof precedes bmarks 1, 3, 5, ...
     #v100_50_128jobs_13.wl # nvprof precedes bmarks 2, 4, 6, ...
+    #
+    # ics 21 (old... now in ics21-volta/ics21-first-attempts
+    #
+    #v100_50_32jobs_0.wl # the "50" is misleading. but cifar training is ~50% fewer jobs
+    #v100_50_64jobs_0.wl # the "50" is misleading. but cifar training is ~50% fewer jobs
+    #v100_50_128jobs_0.wl # the "50" is misleading. but cifar training is ~50% fewer jobs
+    #v100_predict_128jobs_0.wl
+    #v100_rnn_128jobs_0.wl
+    #v100_detect_128jobs_0.wl
+    #v100_train_128jobs_0.wl
+    #
+    # ics 21
+    #
+    #v100_0_4jobs_0.wl # base/4-0-predict.wl
+    #v100_0_4jobs_1.wl # base/4-1-detect.wl
+    #v100_0_4jobs_2.wl # base/4-2-generate.wl
+    #v100_0_4jobs_3.wl # base/4-3-train.wl
+    #
+    #v100_0_8jobs_0.wl
+    #v100_0_8jobs_1.wl
+    #v100_0_8jobs_2.wl
+    #v100_0_8jobs_3.wl
+    #
+    #v100_0_16jobs_0.wl
+    #v100_0_16jobs_1.wl
+    #v100_0_16jobs_2.wl
+    #v100_0_16jobs_3.wl
+    #
+    v100_50_64jobs_4.wl
 )
 
+ZERO_ARGS_ARR=(
+    4 # <-- will throw up to 4 jobs onto GPU0 at once
+    #8 # <-- will throw up to 8 jobs onto GPU0 at once
+    #16 # <-- will throw up to 16 jobs onto GPU0 at once
+)
 SINGLE_ASSIGNMENT_ARGS_ARR=(
-    1
+    #1
     #2 # <-- 2-GPU system
-    #4 # <-- 4-GPU system
+    4 # <-- 4-GPU system
 )
 CG_ARGS_ARR=(
     #2 # <-- Don't use for 4-GPU system. Don't use for 2-GPU system unless sanity checking. This is equivalent to single-assignment.
     #3 # <-- Don't use for 4-GPU system
-    4 # <-- Don't use for 4-GPU system unless sanity checking. This is equivalent to single-assignment.
+    #4 # <-- Don't use for 4-GPU system unless sanity checking. This is equivalent to single-assignment.
     #5
     #6
     #7
@@ -134,27 +174,36 @@ CG_ARGS_ARR=(
     #11
     #12
     #24
+    32
+    #64
+    #96
+    #128
 )
 MGB_ARGS_ARR=(
+    #4
     #6
-    8
+    #8
     #10 # <-- ultimately used for ppopp21 2xp100 results
     #12
     #14
-    #16 # <-- ultimately used for ppopp21 4xv100 results
+    16 # <-- ultimately used for ppopp21 4xv100 results
     #18
     #20
     #24
     #32
+    #64
+    #96
+    #128
     #24.10 # num procs . max jobs waiting for GPU
     #48.10 # num procs . max jobs waiting for GPU
 )
 
 
 declare -A SCHED_ALG_TO_ARGS_ARR=(
-    [single-assignment]="SINGLE_ASSIGNMENT_ARGS_ARR"
+    #[zero]="ZERO_ARGS_ARR"
+    #[single-assignment]="SINGLE_ASSIGNMENT_ARGS_ARR"
     #[cg]="CG_ARGS_ARR"
-    #[mgb_basic]="MGB_ARGS_ARR"
+    [mgb_basic]="MGB_ARGS_ARR"
     #[mgb_simple_compute]="MGB_ARGS_ARR"
     #[mgb]="MGB_ARGS_ARR"
 )
