@@ -11,7 +11,7 @@ for i in {1..1}; do
     # training a classifier on cifar 
     # with 20 of these running, I got 0 failures, but they took 38 minutes
     # usually 2 min 30s, i think
-    (time ./darknet classifier train cfg/cifar.data cfg/cifar_small.cfg) &
+    #(time ./darknet classifier train cfg/cifar.data cfg/cifar_small.cfg) &
 
     # you only look once detection
     # this is usually 1s to run
@@ -22,7 +22,7 @@ for i in {1..1}; do
     # this is a 1.7s run
     # with 20 of them going, lots of fails. never got them all to go through
     # 10 of them complete in 4.3s
-    #(time ./darknet classifier predict cfg/imagenet1k.data cfg/darknet19.cfg weights/darknet19.weights data/dog.jpg) &
+    (time ./darknet classifier predict cfg/imagenet1k.data cfg/darknet19.cfg weights/darknet19.weights data/dog.jpg) &
 
     # generating text with an rnn trained on shakespeare's works
     # with 20 processes, i saw no fails on my first run.
