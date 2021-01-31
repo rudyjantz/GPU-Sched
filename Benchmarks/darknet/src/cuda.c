@@ -11,9 +11,9 @@ int gpu_index = 0;
 
 void cuda_set_device(int n)
 {
-    gpu_index = n;
-    cudaError_t status = cudaSetDevice(n);
-    check_error(status);
+    //gpu_index = n;
+    //cudaError_t status = cudaSetDevice(n);
+    //check_error(status);
 }
 
 int cuda_get_device()
