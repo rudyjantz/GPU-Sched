@@ -24,7 +24,8 @@ WORKLOADER_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver
 #WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ppopp21-volta
 #WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ppopp21-rebuttal/p100
 #WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ppopp21-rebuttal/v100
-WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ics21-volta
+#WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ics21-volta
+WORKLOADS_PATH=${BASE_PATH}/GPU-Sched/src/runtime/driver/workloads/ics21-volta/ics21-first-attempts
 RESULTS_PATH=results
 
 
@@ -125,7 +126,7 @@ WORKLOADS=(
     #
     #v100_50_32jobs_0.wl # the "50" is misleading. but cifar training is ~50% fewer jobs
     #v100_50_64jobs_0.wl # the "50" is misleading. but cifar training is ~50% fewer jobs
-    #v100_50_128jobs_0.wl # the "50" is misleading. but cifar training is ~50% fewer jobs
+    v100_50_128jobs_0.wl # the "50" is misleading. but cifar training is ~50% fewer jobs
     #v100_predict_128jobs_0.wl
     #v100_rnn_128jobs_0.wl
     #v100_detect_128jobs_0.wl
@@ -148,7 +149,7 @@ WORKLOADS=(
     #v100_0_16jobs_2.wl
     #v100_0_16jobs_3.wl
     #
-    v100_50_64jobs_4.wl
+    #v100_50_64jobs_4.wl
 )
 
 ZERO_ARGS_ARR=(
@@ -186,11 +187,11 @@ MGB_ARGS_ARR=(
     #10 # <-- ultimately used for ppopp21 2xp100 results
     #12
     #14
-    16 # <-- ultimately used for ppopp21 4xv100 results
+    #16 # <-- ultimately used for ppopp21 4xv100 results
     #18
     #20
     #24
-    #32
+    32
     #64
     #96
     #128
