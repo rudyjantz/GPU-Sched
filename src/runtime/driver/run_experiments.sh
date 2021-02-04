@@ -144,7 +144,7 @@ WORKLOADS=(
     #v100_0_8jobs_2.wl
     #v100_0_8jobs_3.wl
     #
-    #v100_1_8jobs_0.wl # v100, job set 1 (not darknet19, but resnet252), 8 jobs, predict task
+    #v100_1_8jobs_0.wl # v100, job set 1 (not darknet19, but resnet152), 8 jobs, predict task
     #v100_2_8jobs_0.wl # v100, job set 2 (darknet53_448), 8 jobs, predict task
     #v100_3_8jobs_0.wl # v100, job set 3 (alexnet), 8 jobs, predict task
     #v100_1_8jobs_1.wl # v100, job set 1 (not yolov3-tiny, but yolov3-spp), 8 jobs, detect task (too big, though, throws error when using a single GPU)
