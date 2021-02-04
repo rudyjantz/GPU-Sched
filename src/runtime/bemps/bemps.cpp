@@ -20,10 +20,33 @@
 
 //#define BEMPS_DEBUG
 #define BEMPS_DARKNET
+//#define BEMPS_DARKNET_RODINIA
 
+//
+// 2021.01.31 cporter note:
+// This was some hacky stuff. It started with the BEMPS_DARKNET define. In
+// order to get the numbers for darknet, I needed a few runtime workarounds.
+// One was for freeing (we missed that beacon instrumentation apparently).
+// The other was to correct for underestimation of the memory footprint.
+// (I was multiplying memory footprint by 5 in this library, I believe.)
+// I believe that was all I did there. And it works. Repeat: The BEMPS_DARKNET
+// define did what it needed to do, and we got darknet numbers.
+// But then, in order to use this alongside Rodinia benchmarks, I
+// added more hacks and defined BEMPS_DARKNET_RODINIA. This was a stretch --
+// just seeing if I could get a few more results.  Those never worked to give
+// me the numbers for the final experiment, but I'm leaving them here for
+// posterity. See my notes from 2021.01.30 for more details. I'm also not
+// committing the changes, b/c it didn't work in the end, and also, this should
+// be improved if we have to deal with this again.
+//
 #ifdef BEMPS_DARKNET
 int bemps_tid_darknet = -1;
 #endif
+#ifdef BEMPS_DARKNET_RODINIA
+int bemps_tid_darknet_rodinia = -1;
+#endif
+long dn_rod_nb;
+long dn_rod_tpb;
 
 
 #ifdef BEMPS_DEBUG
@@ -345,6 +368,10 @@ void bemps_beacon(int bemps_tid, bemps_beacon_t *beacon) {
     assert(bemps_tid_darknet == -1 && "only supporting 1 beacon in darknet atm");
     bemps_tid_darknet = bemps_tid;
 #endif
+#ifdef BEMPS_DARKNET_RODINIA
+    //assert(bemps_tid_darknet_rodinia == -1 && "only supporting 1 beacon in darknet atm");
+    bemps_tid_darknet_rodinia = bemps_tid;
+#endif
 }
 /** a simple wrapper to bemps_beacon
  * added by Chao
@@ -364,6 +391,8 @@ void bemps_begin(int id, int gx, int gy, int gz, int bx, int by, int bz,
 
   num_blocks        = gx * gy * gz;
   threads_per_block = bx * by * bz;
+  dn_rod_nb  = num_blocks;
+  dn_rod_tpb = threads_per_block;
   BEMPS_STATS_LOG("pid " << pid << " , "
                << "num_blocks " << num_blocks << " , "
                << "threads_per_block " << threads_per_block << "\n");
@@ -371,7 +400,12 @@ void bemps_begin(int id, int gx, int gy, int gz, int bx, int by, int bz,
   if ((num_blocks * threads_per_block) % 32) {
     warps++;
   }
+#ifdef BEMPS_DARKNET
+  //beacon.mem_B = (uint64_t) (membytes * 2.5);
+  beacon.mem_B = membytes * 5;
+#else
   beacon.mem_B = membytes;
+#endif
   beacon.warps = warps;
   beacon.thread_blocks = num_blocks;
   bemps_beacon(id, &beacon);
@@ -466,6 +500,14 @@ void _send_beacon_at_exit(void) {
     // Runtime workaround for missing free beacon. Ought to happen
     // at exit for our workloads anyways, so it's ok to put it here.
     bemps_free(bemps_tid_darknet);
+#endif
+#ifdef BEMPS_DARKNET_RODINIA
+    if( (dn_rod_nb == 9216 && dn_rod_tpb == 512)
+     || (dn_rod_nb == 12168 && dn_rod_tpb == 512)
+     || (dn_rod_nb == 2 && dn_rod_tpb == 512)
+     || (dn_rod_nb == 56 && dn_rod_tpb == 512)){
+        bemps_free(bemps_tid_darknet_rodinia);
+    }
 #endif
 
   exit_beacon_q_idx = _inc_head(&bemps_shm.gen->beacon_q_head);
