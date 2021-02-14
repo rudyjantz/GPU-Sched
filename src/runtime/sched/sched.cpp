@@ -7,6 +7,8 @@
 #include <limits.h>
 #include <ctype.h>
 
+#include <cuda_runtime_api.h>
+
 #include <algorithm>
 #include <iostream>
 #include <fstream>
@@ -30,6 +32,8 @@
 #define SCHED_MGB_SIMPLE_COMPUTE_THRESHOLD (0.9f)
 
 
+// XXX
+// Deprecated specs. We use cudaGetDeviceProperties now.
 #define GTX_1080_SPECS {            \
   .mem_B = 8116L * 1024 * 1024,     \
   .cores = 2560,                    \
@@ -39,7 +43,6 @@
   .total_thread_blocks  = 20 * 32,  \
   .total_warps          = 20 * 64   \
 }
-
 #define P100_PCIE_SPECS {           \
   .mem_B = 14000L * 1024 * 1024,    \
   .cores = 3584,                    \
@@ -49,7 +52,6 @@
   .total_thread_blocks  = 60 * 32,  \
   .total_warps          = 60 * 64   \
 }
-
 #define V100_SXM2_SPECS {           \
   .mem_B = 10000L * 1024 * 1024,    \
   .cores = 5120,                    \
@@ -60,36 +62,13 @@
   .total_warps          = 80 * 64   \
 }
 
+// FIXME
+// kepler, maxwell, pascal, volta all have 64 warps per sm. not clear how to
+// get it with cudaGetDeviceProperties, so we're hard-coding it for now.
+// Reference: // "Compute Capability" section in the nvidia tesla v100 gpu
+// architecture document (page 18 in the document, page 23 for adobe).
+#define WARPS_PER_SM 64
 
-#if defined(GPU_RES_SLOP)
-#define NUM_GPUS 1
-#define INIT_GPUS()                                  \
-  GPUS[0] = GTX_1080_SPECS;                          \
-  dump_gpu_res("slop");
-
-#elif defined(GPU_RES_CC_2P)
-#define NUM_GPUS 2
-#define INIT_GPUS()                                  \
-  GPUS[0] = P100_PCIE_SPECS;                         \
-  GPUS[1] = P100_PCIE_SPECS;                         \
-  dump_gpu_res("cc_2p");
-
-#elif defined(GPU_RES_AWS_4)
-#define NUM_GPUS 4
-#define INIT_GPUS()                                  \
-  GPUS[0] = V100_SXM2_SPECS;                         \
-  GPUS[1] = V100_SXM2_SPECS;                         \
-  GPUS[2] = V100_SXM2_SPECS;                         \
-  GPUS[3] = V100_SXM2_SPECS;                         \
-  dump_gpu_res("aws_4");
-
-#else
-#define NUM_GPUS 0
-#define INIT_GPUS() \
-  assert(0 &&          \
-         "Must define a valid GPU resource (e.g. GPU_RES_SLOP, \
-               GPU_RES_CC_2, etc.)");
-#endif
 
 #ifdef BEMPS_SCHED_DEBUG
 #define BEMPS_SCHED_LOG(str)                                          \
@@ -211,9 +190,11 @@ sched_stats_t stats;
 sched_alg_e which_scheduler;
 int max_batch_size;
 
-struct gpu_s GPUS[NUM_GPUS];
-struct gpu_in_use_s gpus_in_use[NUM_GPUS];
-struct gpu_and_mem_s gpus_by_mem[NUM_GPUS];
+int NUM_GPUS = 0; // set by init_gpus()
+
+struct gpu_s *GPUS;
+struct gpu_in_use_s *gpus_in_use;
+struct gpu_and_mem_s *gpus_by_mem;
 
 void usage_and_exit(char *prog_name) {
   printf("\n");
@@ -241,20 +222,46 @@ static inline long long get_time_ns(void) {
   return (((long long)ts.tv_sec * 1000000000L) + (long long)(ts.tv_nsec));
 }
 
-static inline void dump_gpu_res(const char *which_env) {
+static inline void dump_gpu_res(void) {
   int i;
-  BEMPS_SCHED_LOG("Running with the following GPU resources (" << which_env
-                                                               << ")\n");
+  cudaDeviceProp prop;
+  BEMPS_SCHED_LOG("Running with the following GPU resources:\n");
   for (i = 0; i < NUM_GPUS; i++) {
-    BEMPS_SCHED_LOG("  GPU " << i << "\n");
+    cudaGetDeviceProperties(&prop, i);
+    BEMPS_SCHED_LOG("  GPU " << i << " (" << prop.name << ")\n");
     BEMPS_SCHED_LOG("  mem_B: " << GPUS[i].mem_B << "\n");
-    BEMPS_SCHED_LOG("  cores: " << GPUS[i].cores << "\n");
+    //BEMPS_SCHED_LOG("  cores: " << GPUS[i].cores << "\n");
     BEMPS_SCHED_LOG("  num_sms: " << GPUS[i].num_sms << "\n");
     BEMPS_SCHED_LOG("  thread_blocks_per_sm: " << GPUS[i].thread_blocks_per_sm << "\n");
     BEMPS_SCHED_LOG("  warps_per_sm: " << GPUS[i].warps_per_sm << "\n");
     BEMPS_SCHED_LOG("  total_thread_blocks: " << GPUS[i].total_thread_blocks << "\n");
     BEMPS_SCHED_LOG("  total_warps: " << GPUS[i].total_warps << "\n");
   }
+}
+
+static inline void init_gpus(void) {
+  int i;
+  cudaDeviceProp prop;
+
+  cudaGetDeviceCount(&NUM_GPUS);
+  assert(NUM_GPUS > 0 && "Must have at least 1 GPU to use the scheduler\n");
+
+  GPUS = (struct gpu_s *) malloc(sizeof(struct gpu_s) * NUM_GPUS);
+  gpus_in_use = (struct gpu_in_use_s *) malloc(sizeof(struct gpu_in_use_s) * NUM_GPUS);
+  gpus_by_mem = (struct gpu_and_mem_s *) malloc(sizeof(struct gpu_and_mem_s) * NUM_GPUS);
+
+  for (i = 0; i < NUM_GPUS; i++) {
+    cudaGetDeviceProperties(&prop, i);
+    GPUS[i].mem_B = prop.totalGlobalMem;
+    GPUS[i].cores = 0; // unused
+    GPUS[i].num_sms = prop.multiProcessorCount;
+    GPUS[i].thread_blocks_per_sm = prop.maxBlocksPerMultiProcessor;
+    GPUS[i].warps_per_sm = WARPS_PER_SM;
+    GPUS[i].total_thread_blocks = prop.multiProcessorCount * prop.maxBlocksPerMultiProcessor;
+    GPUS[i].total_warps = prop.multiProcessorCount * WARPS_PER_SM;
+  }
+
+  dump_gpu_res();
 }
 
 static inline void set_wakeup_time_ns(struct timespec *ts_p) {
@@ -1736,7 +1743,7 @@ void parse_args(int argc, char **argv) {
 }
 
 int main(int argc, char **argv) {
-  INIT_GPUS();
+  init_gpus();
 
   BEMPS_SCHED_LOG("BEMPS SCHEDULER\n");
   signal(SIGINT, sigint_handler);
