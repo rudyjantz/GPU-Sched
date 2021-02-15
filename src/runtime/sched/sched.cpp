@@ -112,13 +112,13 @@ typedef enum {
 
 typedef enum {
   SCHED_ALG_ZERO_E = 0,
-  SCHED_ALG_ROUND_ROBIN_E,
-  SCHED_ALG_ROUND_ROBIN_BEACONS_E,
-  SCHED_ALG_VECTOR_E,
+  //SCHED_ALG_ROUND_ROBIN_E,
+  //SCHED_ALG_ROUND_ROBIN_BEACONS_E,
+  //SCHED_ALG_VECTOR_E,
   SCHED_ALG_SINGLE_ASSIGNMENT_E,
   SCHED_ALG_CG_E,
   SCHED_ALG_MGB_BASIC_E,           // mgb from original ppopp21 submission
-  SCHED_ALG_MGB_SIMPLE_COMPUTE_E,  // mgb simple compute
+  //SCHED_ALG_MGB_SIMPLE_COMPUTE_E,  // mgb simple compute
   SCHED_ALG_MGB_E      // mgb with SM scheduler emulation
 } sched_alg_e;
 
@@ -199,13 +199,21 @@ struct gpu_and_mem_s *gpus_by_mem;
 void usage_and_exit(char *prog_name) {
   printf("\n");
   printf("Usage:\n");
-  printf("    %s [which_scheduler] [jobs_per_gpu]\n", prog_name);
+  printf("    %s <which_scheduler> [jobs_per_gpu]\n", prog_name);
   printf("\n");
   printf(
-      "    which_scheduler is one of zero, round-robin,\n"
-      "    round-robin-beacons, vector, single-assignment, cg,\n"
-      "    mgb_basic, mgb_simple_compute, or mgb\n"
-      "    \n"
+      "    which_scheduler is one of:\n"
+      "      "
+             "zero, "
+             //"round-robin, "
+             //"round-robin-beacons, "
+             //"vector, "
+             "single-assignment, "
+             "cg, "
+             "mgb_basic, "
+             //"mgb_simple_compute, "
+             "or mgb\n"
+      "\n"
       "    jobs_per_gpu is required and only valid for cg; it is an int that\n"
       "    specifies the maximum number of jobs that can be run a GPU\n");
   printf("\n");
@@ -728,199 +736,202 @@ void sched_mgb(void) {
 // this perfect saturation is unlikely, so we assume that the compute units
 // are saturated once the SCHED_MGB_SIMPLE_COMPUTE_THRESHOLD is reached (e.g. 80% max
 // warps and thread blocks).
-void sched_mgb_simple_compute(void) {
-  int tmp_dev_id;
-  int *head_p;
-  int *tail_p;
-  int *jobs_running_on_gpu;
-  int *jobs_waiting_on_gpu;
-  int assigned;
-  struct timespec ts;
-  int boomers_len;
-  int i;
-  bemps_shm_comm_t *comm;
-  int batch_size;
-
-  head_p = &bemps_shm_p->gen->beacon_q_head;
-  tail_p = &bemps_shm_p->gen->beacon_q_tail;
-  jobs_running_on_gpu = &bemps_shm_p->gen->jobs_running_on_gpu;
-  jobs_waiting_on_gpu = &bemps_shm_p->gen->jobs_waiting_on_gpu;
-
-  while (1) {
-    set_wakeup_time_ns(&ts);
-
-    // wait until we get a signal or time out
-    pthread_mutex_lock(&bemps_shm_p->gen->lock);
-    // TODO spurious wakeups ? shouldn't make a big difference to wake up
-    // randomly from time to time before the batch is ready
-    pthread_cond_timedwait(&bemps_shm_p->gen->cond, &bemps_shm_p->gen->lock,
-                           &ts);
-    pthread_mutex_unlock(&bemps_shm_p->gen->lock);
-    bemps_stopwatch_start(&sched_stopwatches[SCHED_STOPWATCH_AWAKE]);
-
-    ALIVE_MSG();
-
-    // First loop: Catch the scheduler's tail back up with the beacon
-    // queue's head. If we see a free-beacon, then reclaim that resource.
-    //BEMPS_SCHED_LOG("*head_p: " << (*head_p) << "\n");
-    //BEMPS_SCHED_LOG("*tail_p: " << (*tail_p) << "\n");
-    batch_size = 0;
-    while (*tail_p != *head_p) {
-      BEMPS_SCHED_LOG("*head_p: " << (*head_p) << "\n");
-      BEMPS_SCHED_LOG("*tail_p: " << (*tail_p) << "\n");
-
-      comm = &bemps_shm_p->comm[*tail_p];
-      while (comm->state != BEMPS_BEACON_STATE_BEACON_FIRED_E) {
-        // TODO probably want to track a stat for this case
-        BEMPS_SCHED_LOG("WARNING: Scheduler hit a beacon before FIRED "
-                        << "was set. (Not a bug, but unless we're "
-                        << "flooded with beacons, this should be rare."
-                        << "\n");
-        BEMPS_SCHED_LOG("WARNING: *tail_p: " << (*tail_p) << "\n");
-        // FIXME sync shouldn't hurt, but may not help?
-        __sync_synchronize();
-      }
-
-      if (comm->exit_flag) {
-        BEMPS_SCHED_LOG("seeing exit flag\n");
-        comm->exit_flag = 0;
-      } else {
-        assert(comm->beacon.mem_B);
-        BEMPS_SCHED_LOG("First loop seeing mem_B: " << comm->beacon.mem_B
-                                                    << "\n");
-        if (comm->beacon.mem_B < 0) {
-          BEMPS_SCHED_LOG("Received free-beacon for pid " << comm->pid << "\n");
-          stats.num_frees++;
-          tmp_dev_id = comm->sched_notif.device_id;
-          // Add (don't subtract), because mem_B is negative already
-          long tmp_bytes_to_free = comm->beacon.mem_B;
-          long tmp_warps_to_free = comm->beacon.warps;
-          BEMPS_SCHED_LOG("Freeing " << tmp_bytes_to_free << " bytes "
-                          << "from device " << tmp_dev_id << "\n");
-          BEMPS_SCHED_LOG("Freeing " << tmp_warps_to_free << " warps "
-                          << "from device " << tmp_dev_id << "\n");
-          gpus_in_use[tmp_dev_id].mem_B += tmp_bytes_to_free;
-          gpus_in_use[tmp_dev_id].warps += tmp_warps_to_free;
-          gpus_in_use[tmp_dev_id].active_jobs--;
-          --*jobs_running_on_gpu;
-        } else {
-          stats.num_beacons++;
-          boomers.push_back(comm);
-          batch_size++; // batch size doesn't include free() beacons
-          ++*jobs_waiting_on_gpu;
-        }
-      }
-
-      *tail_p = (*tail_p + 1) & (BEMPS_BEACON_BUF_SZ - 1);
-    }
-
-    if (batch_size > stats.max_observed_batch_size) {
-      stats.max_observed_batch_size = batch_size;
-    }
-
-    // Second loop: Walk the boomers. This time handle regular beacons, and
-    // attempt to assign them to a device. The boomers are sorted by memory
-    // footprint, highest to lowest.
-    boomers.sort(mem_footprint_compare);
-    boomers_len = boomers.size();
-    if (boomers_len > stats.max_len_boomers) {
-      stats.max_len_boomers = boomers_len;
-    }
-    if (boomers_len > 0) {
-      BEMPS_SCHED_LOG("boomers_len: " << boomers_len << "\n");
-    }
-    for (i = 0; i < boomers_len; i++) {
-      assigned = 0;
-      comm = boomers.front();
-      boomers.pop_front();
-
-      if (comm->age > stats.max_age) {
-        stats.max_age = comm->age;
-      }
-
-      // The target device for a process must have memory available for it,
-      // and it should be the device with the least warps currently in use.
-      long curr_min_warps = LONG_MAX;
-      int target_dev_id = 0;
-      for (tmp_dev_id = 0; tmp_dev_id < NUM_GPUS; tmp_dev_id++) {
-        BEMPS_SCHED_LOG("Checking device "           << tmp_dev_id << "\n"
-                        << "  Total avail bytes: "   << GPUS[tmp_dev_id].mem_B << "\n"
-                        << "  In-use bytes: "        << gpus_in_use[tmp_dev_id].mem_B << "\n"
-                        << "  Trying-to-fit bytes: " << comm->beacon.mem_B << "\n"
-                        << "  In-use warps: "        << gpus_in_use[tmp_dev_id].warps << "\n"
-                        << "  Trying-to-add warps: " << comm->beacon.warps << "\n");
-        if (((gpus_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
-             GPUS[tmp_dev_id].mem_B)) {
-          BEMPS_SCHED_LOG("fits mem\n");
-          if (gpus_in_use[tmp_dev_id].warps < curr_min_warps) {
-              curr_min_warps = gpus_in_use[tmp_dev_id].warps;
-              target_dev_id = tmp_dev_id;
-              assigned = 1;
-              BEMPS_SCHED_LOG("warps are min. target_dev_id set to " << target_dev_id << "\n");
-          }
-        } else {
-            BEMPS_SCHED_LOG("Couldn't fit " << comm->beacon.mem_B << "\n");
-        }
-      }
-
-      // This is the change for "simple compute". A little hacky, but we know
-      // that the target device is the one with the fewest actie warps. So we
-      // only have to check that one to see if it's beneath the threshold.
-      if (assigned) {
-        float max_tbs   = 1.0f * GPUS[target_dev_id].total_thread_blocks;
-        float max_warps = 1.0f * GPUS[target_dev_id].total_warps;
-        float warp_percentage =
-          1.0f
-          * (gpus_in_use[target_dev_id].warps + comm->beacon.warps)
-          / max_warps;
-        BEMPS_SCHED_LOG("max_tbs: " << max_tbs << "\n");
-        BEMPS_SCHED_LOG("max_warps: " << max_warps << "\n");
-        BEMPS_SCHED_LOG("warp_percentage: " << warp_percentage << "\n");
-        BEMPS_SCHED_LOG("active_jobs: " << gpus_in_use[target_dev_id].active_jobs << "\n");
-        if (gpus_in_use[target_dev_id].active_jobs < SCHED_MGB_SIMPLE_COMPUTE_MIN_JOBS) {
-          BEMPS_SCHED_LOG("assigned A\n");
-          assigned = 1;
-        } else if (warp_percentage < SCHED_MGB_SIMPLE_COMPUTE_THRESHOLD) {
-          BEMPS_SCHED_LOG("assigned B\n");
-          assigned = 1;
-        } else {
-          BEMPS_SCHED_LOG("unassigned\n");
-          assigned = 0;
-        }
-      }
-
-      if (!assigned) {
-        // FIXME: need to add stats, and possibly a way to reserve a
-        // GPU to prevent starving.
-        comm->age++;
-        boomers.push_back(comm);
-        // don't adjust jobs-waiting-on-gpu. it was incremented when job first
-        // went into the boomers list
-      } else {
-        long tmp_bytes_to_add = comm->beacon.mem_B;
-        long tmp_warps_to_add = comm->beacon.warps;
-        BEMPS_SCHED_LOG("Adding " << tmp_bytes_to_add << " bytes "
-                        << "to device " << target_dev_id << "\n");
-        BEMPS_SCHED_LOG("Adding " << tmp_warps_to_add << " warps "
-                        << "to device " << target_dev_id << "\n");
-        gpus_in_use[target_dev_id].mem_B += tmp_bytes_to_add;
-        gpus_in_use[target_dev_id].warps += tmp_warps_to_add;
-        BEMPS_SCHED_LOG("sem_post for pid(" << comm->pid << ") "
-                                            << "on device(" << target_dev_id
-                                            << ")\n");
-        // FIXME Is this SCHEDULER_READ state helping at all?
-        comm->state = BEMPS_BEACON_STATE_SCHEDULER_READ_E;
-        comm->sched_notif.device_id = target_dev_id;
-        comm->state = BEMPS_BEACON_STATE_SCHEDULED_E;
-        sem_post(&comm->sched_notif.sem);
-        gpus_in_use[target_dev_id].active_jobs++;
-        ++*jobs_running_on_gpu;
-        --*jobs_waiting_on_gpu;
-      }
-    }
-    bemps_stopwatch_end(&sched_stopwatches[SCHED_STOPWATCH_AWAKE]);
-  }
-}
+//
+// Deprecated
+//
+//void sched_mgb_simple_compute(void) {
+//  int tmp_dev_id;
+//  int *head_p;
+//  int *tail_p;
+//  int *jobs_running_on_gpu;
+//  int *jobs_waiting_on_gpu;
+//  int assigned;
+//  struct timespec ts;
+//  int boomers_len;
+//  int i;
+//  bemps_shm_comm_t *comm;
+//  int batch_size;
+//
+//  head_p = &bemps_shm_p->gen->beacon_q_head;
+//  tail_p = &bemps_shm_p->gen->beacon_q_tail;
+//  jobs_running_on_gpu = &bemps_shm_p->gen->jobs_running_on_gpu;
+//  jobs_waiting_on_gpu = &bemps_shm_p->gen->jobs_waiting_on_gpu;
+//
+//  while (1) {
+//    set_wakeup_time_ns(&ts);
+//
+//    // wait until we get a signal or time out
+//    pthread_mutex_lock(&bemps_shm_p->gen->lock);
+//    // TODO spurious wakeups ? shouldn't make a big difference to wake up
+//    // randomly from time to time before the batch is ready
+//    pthread_cond_timedwait(&bemps_shm_p->gen->cond, &bemps_shm_p->gen->lock,
+//                           &ts);
+//    pthread_mutex_unlock(&bemps_shm_p->gen->lock);
+//    bemps_stopwatch_start(&sched_stopwatches[SCHED_STOPWATCH_AWAKE]);
+//
+//    ALIVE_MSG();
+//
+//    // First loop: Catch the scheduler's tail back up with the beacon
+//    // queue's head. If we see a free-beacon, then reclaim that resource.
+//    //BEMPS_SCHED_LOG("*head_p: " << (*head_p) << "\n");
+//    //BEMPS_SCHED_LOG("*tail_p: " << (*tail_p) << "\n");
+//    batch_size = 0;
+//    while (*tail_p != *head_p) {
+//      BEMPS_SCHED_LOG("*head_p: " << (*head_p) << "\n");
+//      BEMPS_SCHED_LOG("*tail_p: " << (*tail_p) << "\n");
+//
+//      comm = &bemps_shm_p->comm[*tail_p];
+//      while (comm->state != BEMPS_BEACON_STATE_BEACON_FIRED_E) {
+//        // TODO probably want to track a stat for this case
+//        BEMPS_SCHED_LOG("WARNING: Scheduler hit a beacon before FIRED "
+//                        << "was set. (Not a bug, but unless we're "
+//                        << "flooded with beacons, this should be rare."
+//                        << "\n");
+//        BEMPS_SCHED_LOG("WARNING: *tail_p: " << (*tail_p) << "\n");
+//        // FIXME sync shouldn't hurt, but may not help?
+//        __sync_synchronize();
+//      }
+//
+//      if (comm->exit_flag) {
+//        BEMPS_SCHED_LOG("seeing exit flag\n");
+//        comm->exit_flag = 0;
+//      } else {
+//        assert(comm->beacon.mem_B);
+//        BEMPS_SCHED_LOG("First loop seeing mem_B: " << comm->beacon.mem_B
+//                                                    << "\n");
+//        if (comm->beacon.mem_B < 0) {
+//          BEMPS_SCHED_LOG("Received free-beacon for pid " << comm->pid << "\n");
+//          stats.num_frees++;
+//          tmp_dev_id = comm->sched_notif.device_id;
+//          // Add (don't subtract), because mem_B is negative already
+//          long tmp_bytes_to_free = comm->beacon.mem_B;
+//          long tmp_warps_to_free = comm->beacon.warps;
+//          BEMPS_SCHED_LOG("Freeing " << tmp_bytes_to_free << " bytes "
+//                          << "from device " << tmp_dev_id << "\n");
+//          BEMPS_SCHED_LOG("Freeing " << tmp_warps_to_free << " warps "
+//                          << "from device " << tmp_dev_id << "\n");
+//          gpus_in_use[tmp_dev_id].mem_B += tmp_bytes_to_free;
+//          gpus_in_use[tmp_dev_id].warps += tmp_warps_to_free;
+//          gpus_in_use[tmp_dev_id].active_jobs--;
+//          --*jobs_running_on_gpu;
+//        } else {
+//          stats.num_beacons++;
+//          boomers.push_back(comm);
+//          batch_size++; // batch size doesn't include free() beacons
+//          ++*jobs_waiting_on_gpu;
+//        }
+//      }
+//
+//      *tail_p = (*tail_p + 1) & (BEMPS_BEACON_BUF_SZ - 1);
+//    }
+//
+//    if (batch_size > stats.max_observed_batch_size) {
+//      stats.max_observed_batch_size = batch_size;
+//    }
+//
+//    // Second loop: Walk the boomers. This time handle regular beacons, and
+//    // attempt to assign them to a device. The boomers are sorted by memory
+//    // footprint, highest to lowest.
+//    boomers.sort(mem_footprint_compare);
+//    boomers_len = boomers.size();
+//    if (boomers_len > stats.max_len_boomers) {
+//      stats.max_len_boomers = boomers_len;
+//    }
+//    if (boomers_len > 0) {
+//      BEMPS_SCHED_LOG("boomers_len: " << boomers_len << "\n");
+//    }
+//    for (i = 0; i < boomers_len; i++) {
+//      assigned = 0;
+//      comm = boomers.front();
+//      boomers.pop_front();
+//
+//      if (comm->age > stats.max_age) {
+//        stats.max_age = comm->age;
+//      }
+//
+//      // The target device for a process must have memory available for it,
+//      // and it should be the device with the least warps currently in use.
+//      long curr_min_warps = LONG_MAX;
+//      int target_dev_id = 0;
+//      for (tmp_dev_id = 0; tmp_dev_id < NUM_GPUS; tmp_dev_id++) {
+//        BEMPS_SCHED_LOG("Checking device "           << tmp_dev_id << "\n"
+//                        << "  Total avail bytes: "   << GPUS[tmp_dev_id].mem_B << "\n"
+//                        << "  In-use bytes: "        << gpus_in_use[tmp_dev_id].mem_B << "\n"
+//                        << "  Trying-to-fit bytes: " << comm->beacon.mem_B << "\n"
+//                        << "  In-use warps: "        << gpus_in_use[tmp_dev_id].warps << "\n"
+//                        << "  Trying-to-add warps: " << comm->beacon.warps << "\n");
+//        if (((gpus_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
+//             GPUS[tmp_dev_id].mem_B)) {
+//          BEMPS_SCHED_LOG("fits mem\n");
+//          if (gpus_in_use[tmp_dev_id].warps < curr_min_warps) {
+//              curr_min_warps = gpus_in_use[tmp_dev_id].warps;
+//              target_dev_id = tmp_dev_id;
+//              assigned = 1;
+//              BEMPS_SCHED_LOG("warps are min. target_dev_id set to " << target_dev_id << "\n");
+//          }
+//        } else {
+//            BEMPS_SCHED_LOG("Couldn't fit " << comm->beacon.mem_B << "\n");
+//        }
+//      }
+//
+//      // This is the change for "simple compute". A little hacky, but we know
+//      // that the target device is the one with the fewest actie warps. So we
+//      // only have to check that one to see if it's beneath the threshold.
+//      if (assigned) {
+//        float max_tbs   = 1.0f * GPUS[target_dev_id].total_thread_blocks;
+//        float max_warps = 1.0f * GPUS[target_dev_id].total_warps;
+//        float warp_percentage =
+//          1.0f
+//          * (gpus_in_use[target_dev_id].warps + comm->beacon.warps)
+//          / max_warps;
+//        BEMPS_SCHED_LOG("max_tbs: " << max_tbs << "\n");
+//        BEMPS_SCHED_LOG("max_warps: " << max_warps << "\n");
+//        BEMPS_SCHED_LOG("warp_percentage: " << warp_percentage << "\n");
+//        BEMPS_SCHED_LOG("active_jobs: " << gpus_in_use[target_dev_id].active_jobs << "\n");
+//        if (gpus_in_use[target_dev_id].active_jobs < SCHED_MGB_SIMPLE_COMPUTE_MIN_JOBS) {
+//          BEMPS_SCHED_LOG("assigned A\n");
+//          assigned = 1;
+//        } else if (warp_percentage < SCHED_MGB_SIMPLE_COMPUTE_THRESHOLD) {
+//          BEMPS_SCHED_LOG("assigned B\n");
+//          assigned = 1;
+//        } else {
+//          BEMPS_SCHED_LOG("unassigned\n");
+//          assigned = 0;
+//        }
+//      }
+//
+//      if (!assigned) {
+//        // FIXME: need to add stats, and possibly a way to reserve a
+//        // GPU to prevent starving.
+//        comm->age++;
+//        boomers.push_back(comm);
+//        // don't adjust jobs-waiting-on-gpu. it was incremented when job first
+//        // went into the boomers list
+//      } else {
+//        long tmp_bytes_to_add = comm->beacon.mem_B;
+//        long tmp_warps_to_add = comm->beacon.warps;
+//        BEMPS_SCHED_LOG("Adding " << tmp_bytes_to_add << " bytes "
+//                        << "to device " << target_dev_id << "\n");
+//        BEMPS_SCHED_LOG("Adding " << tmp_warps_to_add << " warps "
+//                        << "to device " << target_dev_id << "\n");
+//        gpus_in_use[target_dev_id].mem_B += tmp_bytes_to_add;
+//        gpus_in_use[target_dev_id].warps += tmp_warps_to_add;
+//        BEMPS_SCHED_LOG("sem_post for pid(" << comm->pid << ") "
+//                                            << "on device(" << target_dev_id
+//                                            << ")\n");
+//        // FIXME Is this SCHEDULER_READ state helping at all?
+//        comm->state = BEMPS_BEACON_STATE_SCHEDULER_READ_E;
+//        comm->sched_notif.device_id = target_dev_id;
+//        comm->state = BEMPS_BEACON_STATE_SCHEDULED_E;
+//        sem_post(&comm->sched_notif.sem);
+//        gpus_in_use[target_dev_id].active_jobs++;
+//        ++*jobs_running_on_gpu;
+//        --*jobs_waiting_on_gpu;
+//      }
+//    }
+//    bemps_stopwatch_end(&sched_stopwatches[SCHED_STOPWATCH_AWAKE]);
+//  }
+//}
 
 
 
@@ -1273,306 +1284,312 @@ void sched_single_assignment(void) {
 }
 
 
-void sched_vector(void) {
-  int tmp_dev_id;
-  int *head_p;
-  int *tail_p;
-  int assigned;
-  struct timespec ts;
-  int boomers_len;
-  int i;
-  bemps_shm_comm_t *comm;
-  int batch_size;
-  /*std::priority_queue<bemps_shm_comm_t *,
-                      std::vector<bemps_shm_comm_t *>,
-                      CustomCompare> pq;*/
-  // std::vector<bemps_shm_comm_t *> boomers_sorted;
+//
+// Deprecated
+//
+//void sched_vector(void) {
+//  int tmp_dev_id;
+//  int *head_p;
+//  int *tail_p;
+//  int assigned;
+//  struct timespec ts;
+//  int boomers_len;
+//  int i;
+//  bemps_shm_comm_t *comm;
+//  int batch_size;
+//  /*std::priority_queue<bemps_shm_comm_t *,
+//                      std::vector<bemps_shm_comm_t *>,
+//                      CustomCompare> pq;*/
+//  // std::vector<bemps_shm_comm_t *> boomers_sorted;
+//
+//  head_p = &bemps_shm_p->gen->beacon_q_head;
+//  tail_p = &bemps_shm_p->gen->beacon_q_tail;
+//
+//  while (1) {
+//    set_wakeup_time_ns(&ts);
+//
+//    // wait until we get a signal or time out
+//    pthread_mutex_lock(&bemps_shm_p->gen->lock);
+//    // TODO spurious wakeups ? shouldn't make a big difference to wake up
+//    // randomly from time to time before the batch is ready
+//    pthread_cond_timedwait(&bemps_shm_p->gen->cond, &bemps_shm_p->gen->lock,
+//                           &ts);
+//    pthread_mutex_unlock(&bemps_shm_p->gen->lock);
+//
+//    // First loop: Catch the scheduler's tail back up with the beacon
+//    // queue's head. If we see a free-beacon, then reclaim that resource.
+//    BEMPS_SCHED_LOG("*head_p: " << (*head_p) << "\n");
+//    BEMPS_SCHED_LOG("*tail_p: " << (*tail_p) << "\n");
+//    batch_size = 0;
+//    while (*tail_p != *head_p) {
+//      BEMPS_SCHED_LOG("*tail_p: " << (*tail_p) << "\n");
+//
+//      comm = &bemps_shm_p->comm[*tail_p];
+//      while (comm->state != BEMPS_BEACON_STATE_BEACON_FIRED_E) {
+//        // TODO probably want to track a stat for this case
+//        BEMPS_SCHED_LOG("WARNING: Scheduler hit a beacon before FIRED "
+//                        << "was set. (Not a bug, but unless we're "
+//                        << "flooded with beacons, this should be rare."
+//                        << "\n");
+//        BEMPS_SCHED_LOG("WARNING: *tail_p: " << (*tail_p) << "\n");
+//        // FIXME sync shouldn't hurt, but may not help?
+//        __sync_synchronize();
+//      }
+//
+//      BEMPS_SCHED_LOG("First loop seeing mem_B: " << comm->beacon.mem_B
+//                                                  << "\n");
+//
+//      assert(comm->beacon.mem_B);
+//      if (comm->beacon.mem_B < 0) {
+//        stats.num_frees++;
+//
+//        BEMPS_SCHED_LOG("Received free-beacon for pid " << comm->pid << "\n");
+//        tmp_dev_id = comm->sched_notif.device_id;
+//        // Add (don't subtract), because mem_B is negative already
+//        gpus_in_use[tmp_dev_id].mem_B += comm->beacon.mem_B;
+//        gpus_in_use[tmp_dev_id].warps += comm->beacon.warps;
+//      } else {
+//        stats.num_beacons++;
+//        boomers.push_back(comm);
+//        // pq.push(comm);
+//        batch_size++;
+//      }
+//
+//      *tail_p = (*tail_p + 1) & (BEMPS_BEACON_BUF_SZ - 1);
+//    }
+//
+//    if (batch_size > stats.max_observed_batch_size) {
+//      stats.max_observed_batch_size = batch_size;
+//    }
+//
+//    // Second loop: Walk the boomers. This time handle regular beacons,
+//    // and attempt to assign them a device
+//    // std::sort(boomers.begin(), boomers.end(), mem_footprint_compare);
+//    boomers.sort(mem_footprint_compare);
+//    boomers_len = boomers.size();
+//    if (boomers_len > stats.max_len_boomers) {
+//      stats.max_len_boomers = boomers_len;
+//    }
+//    BEMPS_SCHED_LOG("boomers_len: " << boomers_len << "\n");
+//    for (i = 0; i < boomers_len; i++) {
+//      assigned = 0;
+//      comm = boomers.front();
+//      boomers.pop_front();
+//
+//      if (comm->age > stats.max_age) {
+//        stats.max_age = comm->age;
+//      }
+//
+//      for (tmp_dev_id = 0; tmp_dev_id < NUM_GPUS; tmp_dev_id++) {
+//        /*if (((gpus_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
+//             GPUS[tmp_dev_id].mem_B) &&
+//            ((gpus_in_use[tmp_dev_id].warps + comm->beacon.warps) <
+//             GPUS[tmp_dev_id].warps)) {*/
+//        if (((gpus_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
+//             GPUS[tmp_dev_id].mem_B)) {
+//          gpus_in_use[tmp_dev_id].mem_B += comm->beacon.mem_B;
+//          gpus_in_use[tmp_dev_id].warps += comm->beacon.warps;
+//          assigned = 1;
+//          break;
+//        }
+//      }
+//
+//      if (!assigned) {
+//        // FIXME: need to add stats, and possibly a way to reserve a
+//        // GPU to prevent starving.
+//        comm->age++;
+//        boomers.push_back(comm);
+//      } else {
+//        BEMPS_SCHED_LOG("sem_post for pid(" << comm->pid << ") "
+//                                            << "on device(" << tmp_dev_id
+//                                            << ")\n");
+//        // FIXME Is this SCHEDULER_READ state helping at all?
+//        comm->state = BEMPS_BEACON_STATE_SCHEDULER_READ_E;
+//        comm->sched_notif.device_id = tmp_dev_id;
+//        comm->state = BEMPS_BEACON_STATE_SCHEDULED_E;
+//        sem_post(&comm->sched_notif.sem);
+//      }
+//    }
+//  }
+//}
 
-  head_p = &bemps_shm_p->gen->beacon_q_head;
-  tail_p = &bemps_shm_p->gen->beacon_q_tail;
-
-  while (1) {
-    set_wakeup_time_ns(&ts);
-
-    // wait until we get a signal or time out
-    pthread_mutex_lock(&bemps_shm_p->gen->lock);
-    // TODO spurious wakeups ? shouldn't make a big difference to wake up
-    // randomly from time to time before the batch is ready
-    pthread_cond_timedwait(&bemps_shm_p->gen->cond, &bemps_shm_p->gen->lock,
-                           &ts);
-    pthread_mutex_unlock(&bemps_shm_p->gen->lock);
-
-    // First loop: Catch the scheduler's tail back up with the beacon
-    // queue's head. If we see a free-beacon, then reclaim that resource.
-    BEMPS_SCHED_LOG("*head_p: " << (*head_p) << "\n");
-    BEMPS_SCHED_LOG("*tail_p: " << (*tail_p) << "\n");
-    batch_size = 0;
-    while (*tail_p != *head_p) {
-      BEMPS_SCHED_LOG("*tail_p: " << (*tail_p) << "\n");
-
-      comm = &bemps_shm_p->comm[*tail_p];
-      while (comm->state != BEMPS_BEACON_STATE_BEACON_FIRED_E) {
-        // TODO probably want to track a stat for this case
-        BEMPS_SCHED_LOG("WARNING: Scheduler hit a beacon before FIRED "
-                        << "was set. (Not a bug, but unless we're "
-                        << "flooded with beacons, this should be rare."
-                        << "\n");
-        BEMPS_SCHED_LOG("WARNING: *tail_p: " << (*tail_p) << "\n");
-        // FIXME sync shouldn't hurt, but may not help?
-        __sync_synchronize();
-      }
-
-      BEMPS_SCHED_LOG("First loop seeing mem_B: " << comm->beacon.mem_B
-                                                  << "\n");
-
-      assert(comm->beacon.mem_B);
-      if (comm->beacon.mem_B < 0) {
-        stats.num_frees++;
-
-        BEMPS_SCHED_LOG("Received free-beacon for pid " << comm->pid << "\n");
-        tmp_dev_id = comm->sched_notif.device_id;
-        // Add (don't subtract), because mem_B is negative already
-        gpus_in_use[tmp_dev_id].mem_B += comm->beacon.mem_B;
-        gpus_in_use[tmp_dev_id].warps += comm->beacon.warps;
-      } else {
-        stats.num_beacons++;
-        boomers.push_back(comm);
-        // pq.push(comm);
-        batch_size++;
-      }
-
-      *tail_p = (*tail_p + 1) & (BEMPS_BEACON_BUF_SZ - 1);
-    }
-
-    if (batch_size > stats.max_observed_batch_size) {
-      stats.max_observed_batch_size = batch_size;
-    }
-
-    // Second loop: Walk the boomers. This time handle regular beacons,
-    // and attempt to assign them a device
-    // std::sort(boomers.begin(), boomers.end(), mem_footprint_compare);
-    boomers.sort(mem_footprint_compare);
-    boomers_len = boomers.size();
-    if (boomers_len > stats.max_len_boomers) {
-      stats.max_len_boomers = boomers_len;
-    }
-    BEMPS_SCHED_LOG("boomers_len: " << boomers_len << "\n");
-    for (i = 0; i < boomers_len; i++) {
-      assigned = 0;
-      comm = boomers.front();
-      boomers.pop_front();
-
-      if (comm->age > stats.max_age) {
-        stats.max_age = comm->age;
-      }
-
-      for (tmp_dev_id = 0; tmp_dev_id < NUM_GPUS; tmp_dev_id++) {
-        /*if (((gpus_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
-             GPUS[tmp_dev_id].mem_B) &&
-            ((gpus_in_use[tmp_dev_id].warps + comm->beacon.warps) <
-             GPUS[tmp_dev_id].warps)) {*/
-        if (((gpus_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
-             GPUS[tmp_dev_id].mem_B)) {
-          gpus_in_use[tmp_dev_id].mem_B += comm->beacon.mem_B;
-          gpus_in_use[tmp_dev_id].warps += comm->beacon.warps;
-          assigned = 1;
-          break;
-        }
-      }
-
-      if (!assigned) {
-        // FIXME: need to add stats, and possibly a way to reserve a
-        // GPU to prevent starving.
-        comm->age++;
-        boomers.push_back(comm);
-      } else {
-        BEMPS_SCHED_LOG("sem_post for pid(" << comm->pid << ") "
-                                            << "on device(" << tmp_dev_id
-                                            << ")\n");
-        // FIXME Is this SCHEDULER_READ state helping at all?
-        comm->state = BEMPS_BEACON_STATE_SCHEDULER_READ_E;
-        comm->sched_notif.device_id = tmp_dev_id;
-        comm->state = BEMPS_BEACON_STATE_SCHEDULED_E;
-        sem_post(&comm->sched_notif.sem);
-      }
-    }
-  }
-}
-
-void sched_round_robin(void) {
-  int device_id;
-  int tmp_dev_id;
-  int *head_p;
-  int *tail_p;
-  int bcn_idx;
-  int assigned;
-  struct timespec ts;
-  int boomers_len;
-  int i;
-  bemps_shm_comm_t *comm;
-
-  device_id = 0;
-  head_p = &bemps_shm_p->gen->beacon_q_head;
-  tail_p = &bemps_shm_p->gen->beacon_q_tail;
-
-  while (1) {
-    set_wakeup_time_ns(&ts);
-
-    // wait until we get a signal or time out
-    pthread_mutex_lock(&bemps_shm_p->gen->lock);
-    // TODO spurious wakeups ? shouldn't make a big difference to wake up
-    // randomly from time to time before the batch is ready
-    pthread_cond_timedwait(&bemps_shm_p->gen->cond, &bemps_shm_p->gen->lock,
-                           &ts);
-    pthread_mutex_unlock(&bemps_shm_p->gen->lock);
-
-    // Loop zero: Handle old beacons that haven't been scheduled yet.
-    boomers_len = boomers.size();
-    if (boomers_len > stats.max_len_boomers) {
-      stats.max_len_boomers = boomers_len;
-    }
-    BEMPS_SCHED_LOG("boomers_len: " << boomers_len << "\n");
-    for (i = 0; i < boomers_len; i++) {
-      assigned = 0;
-      tmp_dev_id = device_id;
-      comm = boomers.front();
-      boomers.pop_front();
-
-      if (comm->age > stats.max_age) {
-        stats.max_age = comm->age;
-      }
-
-      while (1) {
-        /*if (((gpus_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
-             GPUS[tmp_dev_id].mem_B) &&
-            ((gpus_in_use[tmp_dev_id].warps + comm->beacon.warps) <
-             GPUS[tmp_dev_id].warps)) {*/
-        if (((gpus_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
-             GPUS[tmp_dev_id].mem_B)) {
-          gpus_in_use[tmp_dev_id].mem_B += comm->beacon.mem_B;
-          gpus_in_use[tmp_dev_id].warps += comm->beacon.warps;
-          assigned = 1;
-          break;
-        }
-
-        tmp_dev_id = (tmp_dev_id + 1) & (NUM_GPUS - 1);
-        if (tmp_dev_id == device_id) {
-          break;
-        }
-      }
-
-      if (!assigned) {
-        // FIXME: need to add stats, and possibly a way to reserve a
-        // GPU to prevent starving.
-        comm->age++;
-        boomers.push_back(comm);
-      } else {
-        // FIXME Is this SCHEDULER_READ state helping at all?
-        comm->state = BEMPS_BEACON_STATE_SCHEDULER_READ_E;
-        comm->sched_notif.device_id = device_id;
-        comm->state = BEMPS_BEACON_STATE_SCHEDULED_E;
-        sem_post(&comm->sched_notif.sem);
-
-        device_id = (device_id + 1) & (NUM_GPUS - 1);
-      }
-    }
-
-    // First loop: Catch the scheduler's tail back up with the beacon
-    // queue's head. If we see a free-beacon, then reclaim that resource.
-    bcn_idx = *tail_p;
-    BEMPS_SCHED_LOG("*head_p: " << (*head_p) << "\n");
-    BEMPS_SCHED_LOG("*tail_p: " << (*tail_p) << "\n");
-    while (*tail_p != *head_p) {
-      BEMPS_SCHED_LOG("*tail_p: " << (*tail_p) << "\n");
-
-      comm = &bemps_shm_p->comm[*tail_p];
-      while (comm->state != BEMPS_BEACON_STATE_BEACON_FIRED_E) {
-        // TODO probably want to track a stat for this case
-        BEMPS_SCHED_LOG("WARNING: Scheduler hit a beacon before FIRED "
-                        << "was set. (Not a bug, but unless we're "
-                        << "flooded with beacons, this should be rare."
-                        << "\n");
-        BEMPS_SCHED_LOG("WARNING: *tail_p: " << (*tail_p) << "\n");
-        // FIXME sync shouldn't hurt, but may not help?
-        __sync_synchronize();
-      }
-
-      BEMPS_SCHED_LOG("First loop seeing mem_B: " << comm->beacon.mem_B
-                                                  << "\n");
-
-      assert(comm->beacon.mem_B);
-      if (comm->beacon.mem_B < 0) {
-        stats.num_frees++;
-
-        BEMPS_SCHED_LOG("Received free-beacon for pid " << comm->pid << "\n");
-        tmp_dev_id = comm->sched_notif.device_id;
-        // Add (don't subtract), because mem_B is negative already
-        gpus_in_use[tmp_dev_id].mem_B += comm->beacon.mem_B;
-        gpus_in_use[tmp_dev_id].warps += comm->beacon.warps;
-      }
-
-      *tail_p = (*tail_p + 1) & (BEMPS_BEACON_BUF_SZ - 1);
-    }
-
-    // Second loop: Walk the queue again. This time handle regular beacons,
-    // and attempt to assign them a device
-    BEMPS_SCHED_LOG("*tail_p: " << (*tail_p) << "\n");
-    BEMPS_SCHED_LOG("bcn_idx: " << (bcn_idx) << "\n");
-    while (bcn_idx != *tail_p) {
-      BEMPS_SCHED_LOG("Second loop bcn_idx: " << (bcn_idx) << "\n");
-
-      assigned = 0;
-      tmp_dev_id = device_id;
-      comm = &bemps_shm_p->comm[bcn_idx];
-
-      if (comm->beacon.mem_B < 0) {
-        bcn_idx = (bcn_idx + 1) & (BEMPS_BEACON_BUF_SZ - 1);
-        continue;
-      }
-      stats.num_beacons++;
-
-      while (1) {
-        /*if (((gpus_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
-             GPUS[tmp_dev_id].mem_B) &&
-            ((gpus_in_use[tmp_dev_id].warps + comm->beacon.warps) <
-             GPUS[tmp_dev_id].warps)) {*/
-        if (((gpus_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
-             GPUS[tmp_dev_id].mem_B)) {
-          gpus_in_use[tmp_dev_id].mem_B += comm->beacon.mem_B;
-          gpus_in_use[tmp_dev_id].warps += comm->beacon.warps;
-          assigned = 1;
-          BEMPS_SCHED_LOG("  assigned\n");
-          break;
-        }else{
-          BEMPS_SCHED_LOG("  not assigned\n");
-        }
-
-        tmp_dev_id = (tmp_dev_id + 1) & (NUM_GPUS - 1);
-        if (tmp_dev_id == device_id) {
-          break;
-        }
-      }
-
-      if (!assigned) {
-        comm->age++;
-        boomers.push_back(comm);
-      } else {
-        BEMPS_SCHED_LOG("sem_post for pid(" << comm->pid << ") "
-                                            << "on device(" << device_id
-                                            << ")\n");
-        // FIXME Is this SCHEDULER_READ state helping at all?
-        comm->state = BEMPS_BEACON_STATE_SCHEDULER_READ_E;
-        comm->sched_notif.device_id = device_id;
-        comm->state = BEMPS_BEACON_STATE_SCHEDULED_E;
-        sem_post(&comm->sched_notif.sem);
-
-        device_id = (device_id + 1) & (NUM_GPUS - 1);
-      }
-
-      bcn_idx = (bcn_idx + 1) & (BEMPS_BEACON_BUF_SZ - 1);
-    }
-  }
-}
+//
+// Deprecated
+//
+//void sched_round_robin(void) {
+//  int device_id;
+//  int tmp_dev_id;
+//  int *head_p;
+//  int *tail_p;
+//  int bcn_idx;
+//  int assigned;
+//  struct timespec ts;
+//  int boomers_len;
+//  int i;
+//  bemps_shm_comm_t *comm;
+//
+//  device_id = 0;
+//  head_p = &bemps_shm_p->gen->beacon_q_head;
+//  tail_p = &bemps_shm_p->gen->beacon_q_tail;
+//
+//  while (1) {
+//    set_wakeup_time_ns(&ts);
+//
+//    // wait until we get a signal or time out
+//    pthread_mutex_lock(&bemps_shm_p->gen->lock);
+//    // TODO spurious wakeups ? shouldn't make a big difference to wake up
+//    // randomly from time to time before the batch is ready
+//    pthread_cond_timedwait(&bemps_shm_p->gen->cond, &bemps_shm_p->gen->lock,
+//                           &ts);
+//    pthread_mutex_unlock(&bemps_shm_p->gen->lock);
+//
+//    // Loop zero: Handle old beacons that haven't been scheduled yet.
+//    boomers_len = boomers.size();
+//    if (boomers_len > stats.max_len_boomers) {
+//      stats.max_len_boomers = boomers_len;
+//    }
+//    BEMPS_SCHED_LOG("boomers_len: " << boomers_len << "\n");
+//    for (i = 0; i < boomers_len; i++) {
+//      assigned = 0;
+//      tmp_dev_id = device_id;
+//      comm = boomers.front();
+//      boomers.pop_front();
+//
+//      if (comm->age > stats.max_age) {
+//        stats.max_age = comm->age;
+//      }
+//
+//      while (1) {
+//        /*if (((gpus_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
+//             GPUS[tmp_dev_id].mem_B) &&
+//            ((gpus_in_use[tmp_dev_id].warps + comm->beacon.warps) <
+//             GPUS[tmp_dev_id].warps)) {*/
+//        if (((gpus_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
+//             GPUS[tmp_dev_id].mem_B)) {
+//          gpus_in_use[tmp_dev_id].mem_B += comm->beacon.mem_B;
+//          gpus_in_use[tmp_dev_id].warps += comm->beacon.warps;
+//          assigned = 1;
+//          break;
+//        }
+//
+//        tmp_dev_id = (tmp_dev_id + 1) & (NUM_GPUS - 1);
+//        if (tmp_dev_id == device_id) {
+//          break;
+//        }
+//      }
+//
+//      if (!assigned) {
+//        // FIXME: need to add stats, and possibly a way to reserve a
+//        // GPU to prevent starving.
+//        comm->age++;
+//        boomers.push_back(comm);
+//      } else {
+//        // FIXME Is this SCHEDULER_READ state helping at all?
+//        comm->state = BEMPS_BEACON_STATE_SCHEDULER_READ_E;
+//        comm->sched_notif.device_id = device_id;
+//        comm->state = BEMPS_BEACON_STATE_SCHEDULED_E;
+//        sem_post(&comm->sched_notif.sem);
+//
+//        device_id = (device_id + 1) & (NUM_GPUS - 1);
+//      }
+//    }
+//
+//    // First loop: Catch the scheduler's tail back up with the beacon
+//    // queue's head. If we see a free-beacon, then reclaim that resource.
+//    bcn_idx = *tail_p;
+//    BEMPS_SCHED_LOG("*head_p: " << (*head_p) << "\n");
+//    BEMPS_SCHED_LOG("*tail_p: " << (*tail_p) << "\n");
+//    while (*tail_p != *head_p) {
+//      BEMPS_SCHED_LOG("*tail_p: " << (*tail_p) << "\n");
+//
+//      comm = &bemps_shm_p->comm[*tail_p];
+//      while (comm->state != BEMPS_BEACON_STATE_BEACON_FIRED_E) {
+//        // TODO probably want to track a stat for this case
+//        BEMPS_SCHED_LOG("WARNING: Scheduler hit a beacon before FIRED "
+//                        << "was set. (Not a bug, but unless we're "
+//                        << "flooded with beacons, this should be rare."
+//                        << "\n");
+//        BEMPS_SCHED_LOG("WARNING: *tail_p: " << (*tail_p) << "\n");
+//        // FIXME sync shouldn't hurt, but may not help?
+//        __sync_synchronize();
+//      }
+//
+//      BEMPS_SCHED_LOG("First loop seeing mem_B: " << comm->beacon.mem_B
+//                                                  << "\n");
+//
+//      assert(comm->beacon.mem_B);
+//      if (comm->beacon.mem_B < 0) {
+//        stats.num_frees++;
+//
+//        BEMPS_SCHED_LOG("Received free-beacon for pid " << comm->pid << "\n");
+//        tmp_dev_id = comm->sched_notif.device_id;
+//        // Add (don't subtract), because mem_B is negative already
+//        gpus_in_use[tmp_dev_id].mem_B += comm->beacon.mem_B;
+//        gpus_in_use[tmp_dev_id].warps += comm->beacon.warps;
+//      }
+//
+//      *tail_p = (*tail_p + 1) & (BEMPS_BEACON_BUF_SZ - 1);
+//    }
+//
+//    // Second loop: Walk the queue again. This time handle regular beacons,
+//    // and attempt to assign them a device
+//    BEMPS_SCHED_LOG("*tail_p: " << (*tail_p) << "\n");
+//    BEMPS_SCHED_LOG("bcn_idx: " << (bcn_idx) << "\n");
+//    while (bcn_idx != *tail_p) {
+//      BEMPS_SCHED_LOG("Second loop bcn_idx: " << (bcn_idx) << "\n");
+//
+//      assigned = 0;
+//      tmp_dev_id = device_id;
+//      comm = &bemps_shm_p->comm[bcn_idx];
+//
+//      if (comm->beacon.mem_B < 0) {
+//        bcn_idx = (bcn_idx + 1) & (BEMPS_BEACON_BUF_SZ - 1);
+//        continue;
+//      }
+//      stats.num_beacons++;
+//
+//      while (1) {
+//        /*if (((gpus_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
+//             GPUS[tmp_dev_id].mem_B) &&
+//            ((gpus_in_use[tmp_dev_id].warps + comm->beacon.warps) <
+//             GPUS[tmp_dev_id].warps)) {*/
+//        if (((gpus_in_use[tmp_dev_id].mem_B + comm->beacon.mem_B) <
+//             GPUS[tmp_dev_id].mem_B)) {
+//          gpus_in_use[tmp_dev_id].mem_B += comm->beacon.mem_B;
+//          gpus_in_use[tmp_dev_id].warps += comm->beacon.warps;
+//          assigned = 1;
+//          BEMPS_SCHED_LOG("  assigned\n");
+//          break;
+//        }else{
+//          BEMPS_SCHED_LOG("  not assigned\n");
+//        }
+//
+//        tmp_dev_id = (tmp_dev_id + 1) & (NUM_GPUS - 1);
+//        if (tmp_dev_id == device_id) {
+//          break;
+//        }
+//      }
+//
+//      if (!assigned) {
+//        comm->age++;
+//        boomers.push_back(comm);
+//      } else {
+//        BEMPS_SCHED_LOG("sem_post for pid(" << comm->pid << ") "
+//                                            << "on device(" << device_id
+//                                            << ")\n");
+//        // FIXME Is this SCHEDULER_READ state helping at all?
+//        comm->state = BEMPS_BEACON_STATE_SCHEDULER_READ_E;
+//        comm->sched_notif.device_id = device_id;
+//        comm->state = BEMPS_BEACON_STATE_SCHEDULED_E;
+//        sem_post(&comm->sched_notif.sem);
+//
+//        device_id = (device_id + 1) & (NUM_GPUS - 1);
+//      }
+//
+//      bcn_idx = (bcn_idx + 1) & (BEMPS_BEACON_BUF_SZ - 1);
+//    }
+//  }
+//}
 
 
 void sched_no_beacons(int is_round_robin) {
@@ -1623,9 +1640,15 @@ void sched_no_beacons(int is_round_robin) {
       comm->state = BEMPS_BEACON_STATE_SCHEDULED_E;
       sem_post(&comm->sched_notif.sem);
 
+      //
+      // Deprecated
+      //
       if (is_round_robin) {
-        device_id = (device_id + 1) & (NUM_GPUS - 1);
+        assert(0);
       }
+      //if (is_round_robin) {
+      //  device_id = (device_id + 1) & (NUM_GPUS - 1);
+      //}
       *tail_p = (*tail_p + 1) & (BEMPS_BEACON_BUF_SZ - 1);
     }
   }
@@ -1635,15 +1658,15 @@ void sched(void) {
   if (which_scheduler == SCHED_ALG_ZERO_E) {
     BEMPS_SCHED_LOG("Starting zero scheduler\n");
     sched_no_beacons(0);
-  } else if (which_scheduler == SCHED_ALG_ROUND_ROBIN_E) {
-    BEMPS_SCHED_LOG("Starting round robin scheduler\n");
-    sched_no_beacons(1);
-  } else if (which_scheduler == SCHED_ALG_ROUND_ROBIN_BEACONS_E) {
-    BEMPS_SCHED_LOG("Starting round robin beacons scheduler\n");
-    sched_round_robin();
-  } else if (which_scheduler == SCHED_ALG_VECTOR_E) {
-    BEMPS_SCHED_LOG("Starting vector scheduler\n");
-    sched_vector();
+  //} else if (which_scheduler == SCHED_ALG_ROUND_ROBIN_E) {
+  //  BEMPS_SCHED_LOG("Starting round robin scheduler\n");
+  //  sched_no_beacons(1);
+  //} else if (which_scheduler == SCHED_ALG_ROUND_ROBIN_BEACONS_E) {
+  //  BEMPS_SCHED_LOG("Starting round robin beacons scheduler\n");
+  //  sched_round_robin();
+  //} else if (which_scheduler == SCHED_ALG_VECTOR_E) {
+  //  BEMPS_SCHED_LOG("Starting vector scheduler\n");
+  //  sched_vector();
   } else if (which_scheduler == SCHED_ALG_SINGLE_ASSIGNMENT_E) {
     BEMPS_SCHED_LOG("Starting single asssignment scheduler\n");
     sched_single_assignment();
@@ -1654,9 +1677,9 @@ void sched(void) {
   } else if (which_scheduler == SCHED_ALG_MGB_BASIC_E) {
     BEMPS_SCHED_LOG("Starting mgb basic scheduler\n");
     sched_mgb_basic();
-  } else if (which_scheduler == SCHED_ALG_MGB_SIMPLE_COMPUTE_E) {
-    BEMPS_SCHED_LOG("Starting mgb simple compute scheduler\n");
-    sched_mgb_simple_compute();
+  //} else if (which_scheduler == SCHED_ALG_MGB_SIMPLE_COMPUTE_E) {
+  //  BEMPS_SCHED_LOG("Starting mgb simple compute scheduler\n");
+  //  sched_mgb_simple_compute();
   } else if (which_scheduler == SCHED_ALG_MGB_E) {
     BEMPS_SCHED_LOG("Starting mgb scheduler\n");
     sched_mgb();
@@ -1679,19 +1702,18 @@ void parse_args(int argc, char **argv) {
   }
 
   if (argc == 1) {
-    which_scheduler = SCHED_ALG_ZERO_E;
-    return;
+    usage_and_exit(argv[0]);
   }
 
   if (strncmp(argv[1], "zero", 5) == 0) {
     which_scheduler = SCHED_ALG_ZERO_E;
-  } else if (strncmp(argv[1], "round-robin", 12) == 0) {
-    which_scheduler = SCHED_ALG_ROUND_ROBIN_E;
-  } else if (strncmp(argv[1], "round-robin-beacons", 20) == 0) {
-    which_scheduler = SCHED_ALG_ROUND_ROBIN_BEACONS_E;
-  } else if (strncmp(argv[1], "vector", 7) == 0) {
-    which_scheduler = SCHED_ALG_VECTOR_E;
-    max_batch_size = SCHED_VECTOR_BATCH_SIZE;
+  //} else if (strncmp(argv[1], "round-robin", 12) == 0) {
+  //  which_scheduler = SCHED_ALG_ROUND_ROBIN_E;
+  //} else if (strncmp(argv[1], "round-robin-beacons", 20) == 0) {
+  //  which_scheduler = SCHED_ALG_ROUND_ROBIN_BEACONS_E;
+  //} else if (strncmp(argv[1], "vector", 7) == 0) {
+  //  which_scheduler = SCHED_ALG_VECTOR_E;
+  //  max_batch_size = SCHED_VECTOR_BATCH_SIZE;
   } else if (strncmp(argv[1], "single-assignment", 18) == 0) {
     which_scheduler = SCHED_ALG_SINGLE_ASSIGNMENT_E;
   } else if (strncmp(argv[1], "cg", 3) == 0) {
@@ -1712,8 +1734,8 @@ void parse_args(int argc, char **argv) {
   } else if (strncmp(argv[1], "mgb", 3) == 0) {
     if (strncmp(argv[1], "mgb_basic", 10) == 0) {
       which_scheduler = SCHED_ALG_MGB_BASIC_E;
-    } else if (strncmp(argv[1], "mgb_simple_compute", 19) == 0) {
-      which_scheduler = SCHED_ALG_MGB_SIMPLE_COMPUTE_E;
+    //} else if (strncmp(argv[1], "mgb_simple_compute", 19) == 0) {
+    //  which_scheduler = SCHED_ALG_MGB_SIMPLE_COMPUTE_E;
     } else if (strncmp(argv[1], "mgb", 4) == 0) {
       which_scheduler = SCHED_ALG_MGB_E;
     } else {
