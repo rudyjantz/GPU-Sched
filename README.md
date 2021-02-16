@@ -37,11 +37,11 @@ For the darknet example, refer to
 In brief, you'll need to build with the libWrapperPass or libGPUBeaconPass
 (either with opt or clang), e.g.
 
-    opt -load libWrapperPass.so
+    opt -load libWrapperPass.so -WP <foo.bc >foo_mod.bc
 
 or:
 
-    clang -Xclang -load -Xclang libGPUBeaconPass.so
+    clang -Xclang -load -Xclang libGPUBeaconPass.so foo.ii -c
 
 And you'll need to link with the lazy runtime library and bemps:
 
