@@ -18,7 +18,7 @@ with applications bound for the GPU, and which could benefit from sharing.
     $ cd GPU-sched
     $ mkdir build
     $ cd build
-    $ cmake ../src -DDEBUG\_LAZY=1
+    $ cmake ../src -DDEBUG_LAZY=1
     $ make
 
 
@@ -51,7 +51,7 @@ And you'll need to link with the lazy runtime library and bemps:
 
 # Running the scheduler
 
-    $ ./bemps\_sched -h
+    $ ./bemps_sched -h
 
     Usage:
         ./bemps_sched <which_scheduler> [jobs_per_gpu]
