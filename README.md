@@ -62,3 +62,14 @@ And you'll need to link with the lazy runtime library and bemps:
         jobs_per_gpu is required and only valid for cg; it is an int that
         specifies the maximum number of jobs that can be run a GPU
 
+
+
+# Example
+
+Terminal 1:
+    $ cd example
+    $ ../build/runtime/sched/bemps_sched zero
+
+Terminal 2:
+    $ cd example
+    $ LD_LIBRARY_PATH=../build/runtime/bemps bash workload.sh
